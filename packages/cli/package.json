@@ -1,0 +1,25 @@
+{
+  "name": "@clearkrypt/cli",
+  "version": "0.1.0",
+  "description": "ClearKrypt command-line interface: new, check, build, emit, and format.",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "bin"
+  ],
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "bin": {
+    "clearkrypt": "./bin/clearkrypt.js"
+  },
+  "dependencies": {
+    "@clearkrypt/compiler-core": "0.1.0",
+    "@clearkrypt/emitter-swift": "0.1.0",
+    "@clearkrypt/emitter-kotlin": "0.1.0",
+    "@clearkrypt/emitter-react": "0.1.0",
+    "@clearkrypt/formatter": "0.1.0"
+  }
+}

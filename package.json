@@ -1,0 +1,25 @@
+{
+  "name": "clearkrypt",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ClearKrypt: a human-readable, visual, native-power application language with a compiler and IDE designed as one system.",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "clean": "tsc --build --clean",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --build --dry"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

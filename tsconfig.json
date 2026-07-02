@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/compiler-core" },
+    { "path": "packages/emitter-swift" },
+    { "path": "packages/emitter-kotlin" },
+    { "path": "packages/emitter-react" },
+    { "path": "packages/formatter" },
+    { "path": "packages/language-service" },
+    { "path": "packages/cli" }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src/**/*"],
+  "references": [
+    { "path": "../compiler-core" },
+    { "path": "../emitter-swift" },
+    { "path": "../emitter-kotlin" },
+    { "path": "../emitter-react" },
+    { "path": "../formatter" }
+  ]
+}

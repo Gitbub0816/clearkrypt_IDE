@@ -1,0 +1,17 @@
+{
+  "name": "@clearkrypt/emitter-react",
+  "version": "0.1.0",
+  "description": "ClearKrypt React/TypeScript emitter: lowers ClearKrypt IR into readable, stable TypeScript source.",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@clearkrypt/compiler-core": "0.1.0"
+  }
+}

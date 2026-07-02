@@ -1,0 +1,17 @@
+{
+  "name": "@clearkrypt/language-service",
+  "version": "0.1.0",
+  "description": "ClearKrypt language intelligence: diagnostics, outline, hover, and completion services for editors.",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@clearkrypt/compiler-core": "0.1.0"
+  }
+}

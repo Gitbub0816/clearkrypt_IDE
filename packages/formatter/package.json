@@ -1,0 +1,17 @@
+{
+  "name": "@clearkrypt/formatter",
+  "version": "0.1.0",
+  "description": "ClearKrypt source formatter: deterministic formatting for .ck files.",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@clearkrypt/compiler-core": "0.1.0"
+  }
+}

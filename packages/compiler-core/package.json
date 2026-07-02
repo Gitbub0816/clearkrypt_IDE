@@ -1,0 +1,14 @@
+{
+  "name": "@clearkrypt/compiler-core",
+  "version": "0.1.0",
+  "description": "ClearKrypt compiler frontend: source loading, lexer, parser, AST, semantic model, type checker, IR, and diagnostics.",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build"
+  }
+}

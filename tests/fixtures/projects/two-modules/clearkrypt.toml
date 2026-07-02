@@ -1,0 +1,11 @@
+[project]
+name = "two-modules"
+version = "0.1.0"
+
+[targets]
+swift = true
+kotlin = true
+react = true
+
+[output]
+dir = "generated"

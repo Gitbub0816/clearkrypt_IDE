@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@clearkrypt/compiler-core": ["packages/compiler-core/src/index.ts"],
+      "@clearkrypt/emitter-swift": ["packages/emitter-swift/src/index.ts"],
+      "@clearkrypt/emitter-kotlin": ["packages/emitter-kotlin/src/index.ts"],
+      "@clearkrypt/emitter-react": ["packages/emitter-react/src/index.ts"],
+      "@clearkrypt/formatter": ["packages/formatter/src/index.ts"],
+      "@clearkrypt/cli": ["packages/cli/src/index.ts"],
+      "@clearkrypt/language-service": ["packages/language-service/src/index.ts"]
+    }
+  }
+}
