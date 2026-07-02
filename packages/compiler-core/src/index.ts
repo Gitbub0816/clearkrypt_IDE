@@ -30,6 +30,7 @@ export * from './syntax/ast';
 
 // IR.
 export * from './ir/nodes';
+export * as irSamples from './ir/testFixtures';
 
 // Emitter contract.
 export * from './emit/contract';
