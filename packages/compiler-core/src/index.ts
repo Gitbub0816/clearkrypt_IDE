@@ -28,6 +28,17 @@ export * from './diagnostics/codes';
 export * from './syntax/tokens';
 export * from './syntax/ast';
 
+// Lexer.
+export { lex, decodeStringLiteral } from './lex/lexer';
+export type { LexOptions, LexResult } from './lex/lexer';
+
+// Parser.
+export { parseSource } from './parse/parser';
+export type { ParseResult } from './parse/parser';
+
+// Debug printing (tokens and AST outline views).
+export { printTokens, printAst } from './syntax/debugPrint';
+
 // IR.
 export * from './ir/nodes';
 export * as irSamples from './ir/testFixtures';

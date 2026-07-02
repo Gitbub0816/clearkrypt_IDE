@@ -1,0 +1,160 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`parseSource - valid fixtures > parses projects/hello-world/src/main.ck with zero diagnostics 1`] = `
+"SourceFile projects/hello-world/src/main.ck 1:1-16:1
+  Module app.main 1:1-1:16
+  Model Greeting 3:1-7:2
+    Field id: ID 4:3-4:9
+    Field message: String 5:3-5:18
+    Field isFriendly: Bool = true 6:3-6:26
+  Function greetingText(greeting: Greeting) -> String 9:1-11:2
+    Return greeting.message 10:3-10:26
+  Function friendlyGreeting(message: String) -> Greeting 13:1-15:2
+    Return Greeting(id: "greeting-1", message: message) 14:3-14:54
+"
+`;
+
+exports[`parseSource - valid fixtures > parses projects/two-modules/src/api.ck with zero diagnostics 1`] = `
+"SourceFile projects/two-modules/src/api.ck 1:1-8:1
+  Module app.api 1:1-1:15
+  Import app.models.User 3:1-3:23
+  Function welcome(user: User) -> String 5:1-7:2
+    Return "Welcome, " + user.name 6:3-6:33
+"
+`;
+
+exports[`parseSource - valid fixtures > parses projects/two-modules/src/models.ck with zero diagnostics 1`] = `
+"SourceFile projects/two-modules/src/models.ck 1:1-7:1
+  Module app.models 1:1-1:18
+  Model User 3:1-6:2
+    Field id: ID 4:3-4:9
+    Field name: String 5:3-5:15
+"
+`;
+
+exports[`parseSource - valid fixtures > parses syntax/async-throws.ck with zero diagnostics 1`] = `
+"SourceFile syntax/async-throws.ck 1:1-16:1
+  Module app.net 1:1-1:15
+  Error NetworkError 3:1-6:2
+    Case timeout 4:3-4:10
+    Case server(message: String) 5:3-5:26
+  Model RemoteUser 8:1-11:2
+    Field id: ID 9:3-9:9
+    Field name: String 10:3-10:15
+  Function fetchUser(id: ID) async throws NetworkError -> RemoteUser 13:1-15:2
+    Return RemoteUser(id: id, name: "Remote") 14:3-14:44
+"
+`;
+
+exports[`parseSource - valid fixtures > parses syntax/capability.ck with zero diagnostics 1`] = `
+"SourceFile syntax/capability.ck 1:1-8:1
+  Module app.scan 1:1-1:16
+  Capability Camera 3:1-3:18
+  Function scanLabel() requires Camera -> String 5:1-7:2
+    Return "scanning" 6:3-6:20
+"
+`;
+
+exports[`parseSource - valid fixtures > parses syntax/enum-associated.ck with zero diagnostics 1`] = `
+"SourceFile syntax/enum-associated.ck 1:1-9:1
+  Module app.booking 1:1-1:19
+  Enum BookingStatus 3:1-8:2
+    Case pending 4:3-4:10
+    Case confirmed 5:3-5:12
+    Case cancelled(reason: String) 6:3-6:28
+    Case completed 7:3-7:12
+"
+`;
+
+exports[`parseSource - valid fixtures > parses syntax/enum-only.ck with zero diagnostics 1`] = `
+"SourceFile syntax/enum-only.ck 1:1-8:1
+  Module app.status 1:1-1:18
+  Enum OrderStatus 3:1-7:2
+    Case pending 4:3-4:10
+    Case shipped 5:3-5:10
+    Case delivered 6:3-6:12
+"
+`;
+
+exports[`parseSource - valid fixtures > parses syntax/error-decl.ck with zero diagnostics 1`] = `
+"SourceFile syntax/error-decl.ck 1:1-8:1
+  Module app.auth 1:1-1:16
+  Error AuthError 3:1-7:2
+    Case invalidCredentials 4:3-4:21
+    Case lockedOut(until: DateTime) 5:3-5:29
+    Case network(message: String) 6:3-6:27
+"
+`;
+
+exports[`parseSource - valid fixtures > parses syntax/model-only.ck with zero diagnostics 1`] = `
+"SourceFile syntax/model-only.ck 1:1-13:1
+  Module app.models 1:1-1:18
+  Model User 3:1-12:2
+    Field id: ID 4:3-4:9
+    Field name: String 5:3-5:15
+    Field email: Email 6:3-6:15
+    Field avatarUrl: URL? 7:3-7:18
+    Field tags: Set<String> 8:3-8:20
+    Field scores: List<Int> 9:3-9:20
+    Field attributes: Map<String, String> 10:3-10:34
+    Field isActive: Bool = true 11:3-11:24
+"
+`;
+
+exports[`parseSource - valid fixtures > parses syntax/native-binding.ck with zero diagnostics 1`] = `
+"SourceFile syntax/native-binding.ck 1:1-14:1
+  Module app.device 1:1-1:18
+  Native swift fn deviceName() -> String 3:1-5:2
+    Raw 3:40-5:2
+      
+        UIDevice.current.name
+      
+  Native kotlin fn deviceName() -> String 7:1-9:2
+    Raw 7:41-9:2
+      
+        android.os.Build.MODEL
+      
+  Native typescript fn deviceName() -> String 11:1-13:2
+    Raw 11:45-13:2
+      
+        return navigator.userAgent
+      
+"
+`;
+
+exports[`parseSource - valid fixtures > parses syntax/screen-component.ck with zero diagnostics 1`] = `
+"SourceFile syntax/screen-component.ck 1:1-25:1
+  Module app.ui 1:1-1:14
+  Model User 3:1-7:2
+    Field id: ID 4:3-4:9
+    Field name: String 5:3-5:15
+    Field email: Email 6:3-6:15
+  Component UserCard(user: User) 9:1-14:2
+    Ui VStack 10:3-13:4
+      Ui Text(user.name) 11:5-11:20
+      Ui Text(user.email) 12:5-12:21
+  Screen ProfileScreen(id: ID) 16:1-22:2
+    Title "Profile" 17:9-17:18
+    Ui VStack 19:3-21:4
+      Ui Text("Profile") 20:5-20:20
+  Route /profile/:id -> ProfileScreen(id: ID) 24:1-24:44
+"
+`;
+
+exports[`parseSource - valid fixtures > parses syntax/simple-function.ck with zero diagnostics 1`] = `
+"SourceFile syntax/simple-function.ck 1:1-22:1
+  Module app.text 1:1-1:16
+  Function fullName(first: String, last: String) -> String 3:1-5:2
+    Return first + " " + last 4:3-4:28
+  Function larger(a: Int, b: Int) -> Int 7:1-13:2
+    If a > b 8:3-12:4
+      Return a 9:5-9:13
+    Else 10:10-12:4
+      Return b 11:5-11:13
+  Function describeCount(count: Int) -> String 15:1-21:2
+    Let label = "items" 16:3-16:22
+    If count == 1 17:3-19:4
+      Return "1 item" 18:5-18:20
+    Return "many " + label 20:3-20:25
+"
+`;
