@@ -1,5 +1,7 @@
 # ClearKrypt Language Specification
 
+> This document supports the ClearKrypt Constitution. If this document conflicts with `/constitution`, the constitution wins. This file is implementation guidance and an early syntax specification, not the highest-authority language law.
+
 ## File extension
 
 ClearKrypt source files use `.ck`.
@@ -28,7 +30,7 @@ screen ProfileScreen(user: User) {
 
 ## Language character
 
-ClearKrypt should feel explicit, readable, typed, and product-oriented. It should avoid clever punctuation when plain structure is clearer.
+ClearKrypt should feel explicit, readable, typed, visual, and native-powerful. It should avoid clever punctuation when plain structure is clearer.
 
 The language should be strict enough to generate reliable code, but ergonomic enough that a developer can write real app flows without drowning in platform boilerplate.
 
@@ -90,10 +92,10 @@ model Profile {
 Generated targets:
 
 - Swift: `URL?`
-- Kotlin: `String?` or target-specific URL abstraction
-- TypeScript: `string | null`
+- Kotlin: nullable type or target-specific abstraction
+- TypeScript: documented nullable union or optional policy
 
-The compiler must define whether optional means nullable, absent, or both. MVP should use nullable semantics and generate explicit serializers.
+The constitution requires that null/absence semantics be explicit. MVP should use nullable/absent semantics and generate explicit serializers.
 
 ## Collections
 
@@ -121,7 +123,7 @@ Rules:
 - Fields are immutable by default in generated data models.
 - Default values are allowed.
 - Validation annotations may be added later.
-- Models should generate Codable/Serializable/Zod or equivalent target support.
+- Models should generate Codable/Serializable/schema or equivalent target support.
 
 ## Enums
 
@@ -200,17 +202,29 @@ route /users/:id -> UserDetailScreen(id: ID)
 
 Route parameters must be typed.
 
-## Effects
+## Effects and capabilities
 
-ClearKrypt needs a controlled effect model for async work, permissions, network calls, file access, and platform APIs.
+The constitution makes effects and capabilities explicit. Capabilities describe platform powers. Effects describe side behavior.
 
-Possible syntax:
+Preferred constitutional direction:
 
 ```ck
-effect FetchUser(id: ID) -> User
+capability Location
+capability Network
+
+fn fetchUser(id: ID) requires Network async throws NetworkError -> User
 ```
 
-MVP can defer a full effect system, but the compiler architecture should leave room for one.
+Older `effect FetchUser(id: ID) -> User` examples should be treated as pre-constitutional placeholders, not current preferred syntax.
+
+MVP can parse capability/effect declarations incrementally, but compiler architecture should reserve space for:
+
+- capability declarations
+- `requires` clauses
+- async behavior
+- typed errors
+- target permission diagnostics
+- visual effect graphs
 
 ## Errors
 
@@ -234,7 +248,7 @@ Generated targets:
 
 - Swift: `throws` or result type depending on target profile.
 - Kotlin: sealed result or exception wrapper.
-- TypeScript: `Result<T, E>` preferred for typed clarity.
+- TypeScript: `Result<T, E>` or documented typed promise policy.
 
 ## Interop blocks
 
@@ -291,7 +305,7 @@ dir = "generated"
 
 Initial reserved words:
 
-`module`, `import`, `model`, `enum`, `fn`, `screen`, `component`, `route`, `effect`, `error`, `native`, `swift`, `kotlin`, `typescript`, `react`, `let`, `var`, `if`, `else`, `for`, `in`, `while`, `return`, `throws`, `try`, `catch`, `true`, `false`, `null`, `public`, `private`, `internal`.
+`module`, `import`, `model`, `enum`, `fn`, `screen`, `component`, `route`, `effect`, `capability`, `requires`, `error`, `native`, `swift`, `kotlin`, `typescript`, `react`, `let`, `var`, `if`, `else`, `for`, `in`, `while`, `return`, `throws`, `try`, `catch`, `async`, `true`, `false`, `null`, `public`, `private`, `internal`.
 
 ## MVP syntax acceptance
 
@@ -304,5 +318,6 @@ The MVP parser should accept a narrow but real subset:
 - Functions with primitive expressions.
 - Basic components and screens.
 - Native target blocks as raw parsed nodes.
+- Capability declarations and `requires` clauses as parsed or reserved forms.
 
 Do not implement the entire language before the compiler spine works.
