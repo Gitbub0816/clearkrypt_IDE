@@ -9,6 +9,7 @@ import {
   IrParam,
 } from '@clearkrypt/compiler-core';
 import { renderExpr, renderStatements } from './expressions';
+import { renderSignatureLines } from './signature';
 import { renderReturnClause, renderType } from './types';
 import { swiftIdentifier } from './naming';
 
@@ -37,7 +38,7 @@ export function renderModel(model: IrModel, diagnostics: Diagnostic[]): Rendered
   }
 
   const lines: string[] = [`public struct ${model.name}: Hashable {`, ...fieldLines, ''];
-  lines.push(`    public init(${initParams.join(', ')}) {`);
+  lines.push(...renderSignatureLines('    ', 'public init', initParams, ' {'));
   lines.push(...initAssignments);
   lines.push('    }');
   lines.push('}');
@@ -114,7 +115,9 @@ export function renderFunction(fn: IrFunction, diagnostics: Diagnostic[]): Rende
   if (fn.throwsType !== undefined) {
     lines.push(`/// - Throws: ${fn.throwsType.name}`);
   }
-  lines.push(`public func ${fn.name}(${paramTexts.join(', ')})${modifiers}${returnClause.clause} {`);
+  lines.push(
+    ...renderSignatureLines('', `public func ${fn.name}`, paramTexts, `${modifiers}${returnClause.clause} {`),
+  );
   lines.push(...renderStatements(fn.body, fn.origin, diagnostics, 1));
   lines.push('}');
 

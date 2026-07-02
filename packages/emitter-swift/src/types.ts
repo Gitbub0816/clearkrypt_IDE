@@ -43,9 +43,8 @@ export function renderType(type: IrType, origin: IrOrigin, diagnostics: Diagnost
         case 'Never':
           return { text: 'Never', needsFoundation: false };
         default: {
-          diagnostics.push(
-            unsupportedFeature(origin, `Unrecognized primitive type '${String(type.name)}'`),
-          );
+          const unknownName = (type as { name: string }).name;
+          diagnostics.push(unsupportedFeature(origin, `Unrecognized primitive type '${unknownName}'`));
           return { text: 'Never', needsFoundation: false };
         }
       }
