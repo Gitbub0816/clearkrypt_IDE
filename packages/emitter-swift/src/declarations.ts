@@ -1,0 +1,122 @@
+import {
+  Diagnostic,
+  IrEnum,
+  IrEnumCase,
+  IrErrorType,
+  IrField,
+  IrFunction,
+  IrModel,
+  IrParam,
+} from '@clearkrypt/compiler-core';
+import { renderExpr, renderStatements } from './expressions';
+import { renderReturnClause, renderType } from './types';
+import { swiftIdentifier } from './naming';
+
+export interface RenderedDecl {
+  readonly lines: readonly string[];
+  readonly needsFoundation: boolean;
+}
+
+function mergeFoundation(...flags: readonly boolean[]): boolean {
+  return flags.some(Boolean);
+}
+
+export function renderModel(model: IrModel, diagnostics: Diagnostic[]): RenderedDecl {
+  let needsFoundation = false;
+  const fieldLines: string[] = [];
+  const initParams: string[] = [];
+  const initAssignments: string[] = [];
+
+  for (const f of model.fields) {
+    const type = renderType(f.type, f.origin, diagnostics);
+    needsFoundation = mergeFoundation(needsFoundation, type.needsFoundation);
+    const name = swiftIdentifier(f.name);
+    fieldLines.push(`    public let ${name}: ${type.text}`);
+    initParams.push(renderInitParam(f, diagnostics));
+    initAssignments.push(`        self.${name} = ${name}`);
+  }
+
+  const lines: string[] = [`public struct ${model.name}: Hashable {`, ...fieldLines, ''];
+  lines.push(`    public init(${initParams.join(', ')}) {`);
+  lines.push(...initAssignments);
+  lines.push('    }');
+  lines.push('}');
+
+  return { lines, needsFoundation };
+}
+
+function renderInitParam(field: IrField, diagnostics: Diagnostic[]): string {
+  const type = renderType(field.type, field.origin, diagnostics);
+  const name = swiftIdentifier(field.name);
+  if (field.defaultValue === undefined) {
+    return `${name}: ${type.text}`;
+  }
+  const defaultText = renderExpr(field.defaultValue, field.origin, diagnostics);
+  return `${name}: ${type.text} = ${defaultText}`;
+}
+
+function renderEnumCase(enumCase: IrEnumCase, diagnostics: Diagnostic[]): string {
+  const name = swiftIdentifier(enumCase.name);
+  if (enumCase.fields.length === 0) {
+    return `    case ${name}`;
+  }
+  const params = enumCase.fields
+    .map((f) => `${swiftIdentifier(f.name)}: ${renderType(f.type, f.origin, diagnostics).text}`)
+    .join(', ');
+  return `    case ${name}(${params})`;
+}
+
+export function renderEnum(irEnum: IrEnum, diagnostics: Diagnostic[]): RenderedDecl {
+  const conformance = irEnum.isSimple ? 'String, Hashable' : 'Hashable';
+  const lines = [
+    `public enum ${irEnum.name}: ${conformance} {`,
+    ...irEnum.cases.map((c) => renderEnumCase(c, diagnostics)),
+    '}',
+  ];
+  return { lines, needsFoundation: false };
+}
+
+export function renderErrorType(error: IrErrorType, diagnostics: Diagnostic[]): RenderedDecl {
+  const lines = [
+    `public enum ${error.name}: Error, Hashable {`,
+    ...error.cases.map((c) => renderEnumCase(c, diagnostics)),
+    '}',
+  ];
+  return { lines, needsFoundation: false };
+}
+
+function renderParam(param: IrParam, diagnostics: Diagnostic[]): { text: string; needsFoundation: boolean } {
+  const type = renderType(param.type, param.origin, diagnostics);
+  const name = swiftIdentifier(param.name);
+  const defaultText =
+    param.defaultValue === undefined ? '' : ` = ${renderExpr(param.defaultValue, param.origin, diagnostics)}`;
+  return { text: `${name}: ${type.text}${defaultText}`, needsFoundation: type.needsFoundation };
+}
+
+export function renderFunction(fn: IrFunction, diagnostics: Diagnostic[]): RenderedDecl {
+  let needsFoundation = false;
+  const paramTexts: string[] = [];
+  for (const param of fn.params) {
+    const rendered = renderParam(param, diagnostics);
+    needsFoundation = mergeFoundation(needsFoundation, rendered.needsFoundation);
+    paramTexts.push(rendered.text);
+  }
+
+  const returnClause = renderReturnClause(fn.returnType, fn.origin, diagnostics);
+  needsFoundation = mergeFoundation(needsFoundation, returnClause.needsFoundation);
+
+  const modifiers = [fn.isAsync ? 'async' : undefined, fn.throwsType !== undefined ? 'throws' : undefined]
+    .filter((m): m is string => m !== undefined)
+    .map((m) => ` ${m}`)
+    .join('');
+
+  const lines: string[] = [];
+  if (fn.throwsType !== undefined) {
+    lines.push(`/// - Throws: ${fn.throwsType.name}`);
+  }
+  lines.push(`public func ${fn.name}(${paramTexts.join(', ')})${modifiers}${returnClause.clause} {`);
+  lines.push(...renderStatements(fn.body, fn.origin, diagnostics, 1));
+  lines.push('}');
+
+  return { lines, needsFoundation };
+}

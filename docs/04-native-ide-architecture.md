@@ -1,25 +1,44 @@
 # Native IDE Architecture
 
+> This document supports the ClearKrypt Constitution. If it conflicts with
+> `/constitution`, the constitution wins.
+
 ## IDE mission
 
-ClearKrypt IDE should be a native development environment for the ClearKrypt language, not just a generic text editor.
+ClearKrypt IDE should be a native development environment for the ClearKrypt
+language, not just a generic text editor.
 
-It should help developers understand source files, generated targets, diagnostics, project structure, build outputs, and cross-platform differences.
+It should help developers understand source files, generated targets,
+diagnostics, project structure, build outputs, and cross-platform
+differences.
 
-## Recommended IDE strategy
+## Platform strategy
 
-Start with a desktop IDE shell that can run on macOS first, then expand. The most practical initial path is:
+ClearKrypt ships two first-party native IDEs, developed in `/ide`:
 
-- Native shell: SwiftUI on macOS.
-- Editor engine: Monaco embedded or CodeMirror embedded for fast MVP, then consider a native editor later.
-- Language intelligence: ClearKrypt language server.
-- Build integration: CLI-driven compiler commands.
+- **Windows IDE** — C# (.NET 8, Avalonia UI), in `ide/windows`. Distributed
+  as a self-contained Windows download (`dotnet publish -r win-x64`).
+  Avalonia keeps the codebase 100% C# and buildable in Linux CI while
+  shipping a native Windows desktop app.
+- **macOS IDE** — Swift (SwiftUI + AppKit editor host), in `ide/macos`.
+  Distributed as a macOS app download, built and verified on macOS CI.
 
-A pure native editor can be built later, but the first milestone should prioritize compiler integration and project understanding.
+Both shells are thin native frontends over the same brain:
+
+- **Language intelligence**: the ClearKrypt language server
+  (`clearkrypt language-server --stdio`), protocol in
+  `docs/21-language-server.md`.
+- **Build integration**: the ClearKrypt CLI with `--json` diagnostics.
+- **Syntax highlighting**: semantic tokens from the language server, with
+  the shared TextMate grammar (`editors/clearkrypt.tmLanguage.json`) as the
+  instant fallback while the server warms up.
+
+Neither IDE reimplements any part of the language. That is constitutional
+law (Document 7 §4): the IDE shows what the compiler sees.
 
 ## Core areas
 
-The IDE should include:
+Both IDEs implement the same core surfaces:
 
 - Project navigator.
 - Source editor.
@@ -28,9 +47,9 @@ The IDE should include:
 - Target selector.
 - Build panel.
 - Symbol outline.
-- Preview panel.
-- Terminal/task output panel.
 - Settings panel.
+
+Later: preview panel, visual graphs, terminal/task output.
 
 ## Project navigator
 
@@ -45,42 +64,38 @@ The navigator should understand ClearKrypt project structure:
 - `docs/`
 
 It should group files by purpose, not just raw folders, when possible.
+Generated files must be visually distinct from source.
 
 ## Source editor
 
-Required editor features:
+Required editor features (MVP → mature):
 
-- Syntax highlighting.
+- Syntax highlighting (TextMate fallback, semantic tokens primary).
 - Bracket matching.
-- Format on save.
-- Diagnostics underlines.
-- Hover explanations.
-- Go to definition.
-- Find references.
-- Rename.
-- Autocomplete.
-- Snippets for model, enum, screen, component, route, and native blocks.
+- Diagnostics underlines with hover explanations.
+- Document outline from `textDocument/documentSymbol`.
+- Format on save (`textDocument/formatting`).
+- Completion, hover.
+- Go to definition, references, rename (as the language server grows).
+- Generated files open read-only by default.
+
+Editor hosts: AvaloniaEdit with TextMate support on Windows;
+NSTextView-based editor on macOS.
 
 ## Language server
 
-The language server should expose:
+See `docs/21-language-server.md` for the full contract: supported LSP
+methods, the semantic token legend, ClearKrypt extension methods
+(`clearkrypt/projectInfo`, `clearkrypt/check`, `clearkrypt/generatedMap`),
+and the CLI JSON schema.
 
-- Document symbols.
-- Workspace symbols.
-- Completion.
-- Hover.
-- Diagnostics.
-- Definition.
-- References.
-- Rename.
-- Formatting.
-- Semantic tokens.
-
-The IDE should talk to the language server rather than duplicating compiler logic.
+The IDEs locate the ClearKrypt SDK via user setting, then the
+`CLEARKRYPT_SDK` environment variable, then `PATH`.
 
 ## Build integration
 
-The IDE should call the CLI for check/build/emit tasks. Build output should be parsed into structured diagnostics where possible.
+The IDE calls the CLI for check/build/emit tasks and parses `--json` output
+into structured diagnostics.
 
 Basic actions:
 
@@ -92,46 +107,30 @@ Basic actions:
 
 ## Target selector
 
-The target selector controls what the compiler validates.
-
-Examples:
+The target selector controls what the compiler validates and emits:
 
 - Swift only.
 - Kotlin only.
 - React only.
-- Swift + Kotlin.
-- Swift + Kotlin + React.
+- Any combination.
 
-Target-specific diagnostics must be clearly marked.
+Target-specific diagnostics must be clearly marked with the target name.
 
 ## Generated output explorer
 
-The IDE must let developers inspect generated Swift, Kotlin, and TypeScript without treating generated code as mysterious.
+The IDE must let developers inspect generated Swift, Kotlin, and TypeScript
+without treating generated code as mysterious.
 
 Recommended features:
 
-- Source-to-generated file mapping.
+- Source-to-generated file mapping (`clearkrypt/generatedMap`).
 - Generated file search.
 - Diff from previous generation.
 - Open generated file read-only by default.
-- Option to detach a generated file later if the project model supports it.
-
-## Preview panel
-
-Initial previews can be textual and structural:
-
-- Component tree preview.
-- Route graph preview.
-- Model/schema preview.
-- Target output preview.
-
-Later previews can include live SwiftUI/Compose/React rendering where practical.
 
 ## Debugging model
 
-Early debugging should focus on compiler and generated output. Full runtime debugging across targets is out of MVP scope.
-
-The IDE should support:
+Early debugging focuses on compiler and generated output, not runtime:
 
 - Compiler trace view.
 - AST view.
@@ -139,26 +138,27 @@ The IDE should support:
 - Target lowering view.
 - Generated file mapping.
 
+Full runtime debugging across targets is a later milestone.
+
 ## Settings
 
-Project settings should be stored in `clearkrypt.toml` when they are part of the build. User editor settings should be local and not committed by default.
+Project settings that affect builds live in `clearkrypt.toml` (versioned).
+User preferences (theme, SDK path, font) are local per IDE and not
+committed (Constitution Document 7 §20).
 
 ## Native IDE MVP
 
-MVP acceptance:
+MVP acceptance (identical for both platforms):
 
-- Open a ClearKrypt project.
-- Show file tree.
-- Edit `.ck` files.
-- Run check/build.
-- Display diagnostics.
-- Show generated outputs.
+- Open a ClearKrypt project (folder containing `clearkrypt.toml`).
+- Show grouped file tree.
+- Edit `.ck` files with highlighting and live diagnostics.
+- Run check/build; display structured results.
 - Select targets.
-- Launch language server.
+- Show generated outputs read-only.
+- Launch and monitor the language server.
 
 ## Future IDE features
-
-Later features:
 
 - Visual route graph.
 - UI component inspector.
@@ -166,6 +166,6 @@ Later features:
 - Package manager UI.
 - Target capability matrix.
 - Test runner.
-- Integrated formatter settings.
 - Generated-code diff viewer.
 - Compiler performance profiler.
+- Agent worktree board.

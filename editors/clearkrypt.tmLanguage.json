@@ -1,0 +1,123 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "ClearKrypt",
+  "scopeName": "source.clearkrypt",
+  "fileTypes": ["ck"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#native-declaration" },
+    { "include": "#route-declaration" },
+    { "include": "#declarations" },
+    { "include": "#keywords" },
+    { "include": "#types" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#constants" },
+    { "include": "#operators" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        { "name": "comment.line.double-slash.clearkrypt", "match": "//.*$" },
+        { "name": "comment.block.clearkrypt", "begin": "/\\*", "end": "\\*/" }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.clearkrypt",
+      "begin": "\"",
+      "end": "\"|$",
+      "patterns": [
+        { "name": "constant.character.escape.clearkrypt", "match": "\\\\[\"\\\\nrt]" }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        { "name": "constant.numeric.float.clearkrypt", "match": "\\b[0-9]+\\.[0-9]+\\b" },
+        { "name": "constant.numeric.integer.clearkrypt", "match": "\\b[0-9]+\\b" }
+      ]
+    },
+    "constants": {
+      "name": "constant.language.clearkrypt",
+      "match": "\\b(true|false|null)\\b"
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.clearkrypt",
+          "match": "\\b(if|else|for|in|while|return|try|catch)\\b"
+        },
+        {
+          "name": "keyword.declaration.clearkrypt",
+          "match": "\\b(module|import|model|enum|error|capability|fn|screen|component|route|native|state|service|protocol)\\b"
+        },
+        {
+          "name": "keyword.other.clearkrypt",
+          "match": "\\b(let|var|requires|async|throws|effect|public|private|internal)\\b"
+        },
+        {
+          "name": "keyword.other.target.clearkrypt",
+          "match": "\\b(swift|kotlin|typescript|react)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "support.type.primitive.clearkrypt",
+          "match": "\\b(String|Int|Float|Decimal|Bool|Date|DateTime|ID|Email|URL|Data|Void|Never|List|Map|Set)\\b"
+        },
+        {
+          "match": "(:|->)\\s*([A-Z][A-Za-z0-9_]*)",
+          "captures": {
+            "2": { "name": "entity.name.type.clearkrypt" }
+          }
+        }
+      ]
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "match": "\\b(model|enum|error|screen|component|capability)\\s+([A-Z][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.clearkrypt" },
+            "2": { "name": "entity.name.type.declaration.clearkrypt" }
+          }
+        },
+        {
+          "match": "\\b(fn)\\s+([a-zA-Z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.clearkrypt" },
+            "2": { "name": "entity.name.function.clearkrypt" }
+          }
+        },
+        {
+          "match": "\\b(module|import)\\s+([a-z][A-Za-z0-9_.]*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.clearkrypt" },
+            "2": { "name": "entity.name.namespace.clearkrypt" }
+          }
+        }
+      ]
+    },
+    "route-declaration": {
+      "match": "\\b(route)\\s+([/:A-Za-z0-9_]+)\\s*(->)\\s*([A-Z][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "keyword.declaration.clearkrypt" },
+        "2": { "name": "string.other.route-path.clearkrypt" },
+        "3": { "name": "keyword.operator.arrow.clearkrypt" },
+        "4": { "name": "entity.name.type.screen.clearkrypt" }
+      }
+    },
+    "native-declaration": {
+      "match": "\\b(native)\\s+(swift|kotlin|typescript)\\b",
+      "captures": {
+        "1": { "name": "keyword.declaration.native.clearkrypt" },
+        "2": { "name": "keyword.other.target.clearkrypt" }
+      }
+    },
+    "operators": {
+      "name": "keyword.operator.clearkrypt",
+      "match": "->|==|!=|<=|>=|&&|\\|\\||[+\\-*/%=<>!?]"
+    }
+  }
+}

@@ -30,8 +30,7 @@ Packages:
 - cli
 - formatter
 - language-service
-- ide-core
-- ide-native
+- ide shells (native projects in /ide: Windows C#, macOS Swift)
 
 ## Phase 2: compiler frontend
 
