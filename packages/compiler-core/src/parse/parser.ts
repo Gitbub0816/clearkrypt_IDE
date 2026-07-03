@@ -676,6 +676,7 @@ class Parser {
       kind === 'KwReturn' ||
       kind === 'KwIf' ||
       kind === 'KwThrow' ||
+      kind === 'KwFn' ||
       this.startsExpression(kind)
     );
   }
@@ -686,6 +687,7 @@ class Parser {
     if (kind === 'KwReturn') return this.parseReturnStatement();
     if (kind === 'KwIf') return this.parseIfLike();
     if (kind === 'KwThrow') return this.parseThrowStatement();
+    if (kind === 'KwFn') return this.parseFunctionDecl();
     const expression = this.parseExpression();
     return { kind: 'ExpressionStatement', expression, span: expression.span };
   }

@@ -1,8 +1,9 @@
 import { IrArgument, IrBinaryOperator, IrExpression, IrIf, IrOrigin, IrStatement } from '@clearkrypt/compiler-core';
 import { KotlinCtx } from './context';
-import { addCrossModuleImport } from './types';
+import { addCrossModuleImport, renderType } from './types';
 import { unsupportedFeature } from './diagnostics';
 import { kotlinIdentifier, pascalCase } from './naming';
+import { renderSignatureLines } from './signature';
 
 const INDENT = '    ';
 
@@ -205,6 +206,21 @@ function renderStatement(statement: IrStatement, origin: IrOrigin, ctx: KotlinCt
       return [`${pad}throw ${renderExpr(statement.value, origin, ctx)}`];
     case 'expr':
       return [`${pad}${renderExpr(statement.expression, origin, ctx)}`];
+    case 'localFunction': {
+      const fn = statement.function;
+      const paramTexts = fn.params.map((p) => {
+        const type = renderType(p.type, p.origin, ctx);
+        const defaultText =
+          p.defaultValue === undefined ? '' : ` = ${renderExpr(p.defaultValue, p.origin, ctx)}`;
+        return `${kotlinIdentifier(p.name)}: ${type}${defaultText}`;
+      });
+      const returnType = renderType(fn.returnType, fn.origin, ctx);
+      const prefix = fn.isAsync ? 'suspend fun' : 'fun';
+      const lines = renderSignatureLines(pad, `${prefix} ${fn.name}`, paramTexts, `: ${returnType} {`);
+      lines.push(...renderStatements(fn.body, fn.origin, ctx, level + 1));
+      lines.push(`${pad}}`);
+      return lines;
+    }
     default: {
       const unknownKind = (statement as { kind: string }).kind;
       ctx.diagnostics.push(unsupportedFeature(origin, `Unrecognized IR statement kind '${unknownKind}'`));

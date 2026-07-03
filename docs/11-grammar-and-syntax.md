@@ -114,6 +114,22 @@ fn fullName(first: String, last: String) -> String {
 }
 ```
 
+A `fn` is also valid as a statement inside any block: a nested (local)
+function, with its own return type and its own `throws` clause, but able to
+read every enclosing parameter and local (real lexical capture) and to call
+itself (self-recursion). It emits as a Swift local `func`, a Kotlin local
+`fun`, or a TypeScript nested `function` — all three capture the enclosing
+scope natively, so lowering needs no extra machinery for closures.
+
+```ck
+fn discountedTotal(base: Int, discountPercent: Int) -> Int {
+  fn applyDiscount(amount: Int) -> Int {
+    return amount - (amount * discountPercent / 100)
+  }
+  return applyDiscount(amount: base)
+}
+```
+
 ## Components
 
 ```ck

@@ -169,6 +169,23 @@ describe('language power pack end to end', () => {
   });
 });
 
+describe('nested (local) functions end to end', () => {
+  it('builds capturing and self-recursive local functions for all targets', async () => {
+    const root = copyProject('hello-world');
+    fs.copyFileSync(
+      path.join(fixturesRoot, 'syntax', 'nested-functions.ck'),
+      path.join(root, 'src', 'main.ck'),
+    );
+    const result = await runCli(['build', root], workDir);
+    expect(result.code).toBe(0);
+
+    const read = (relative: string) => fs.readFileSync(path.join(root, relative), 'utf8');
+    expect(read('generated/swift/app/nested/Functions.swift')).toMatchSnapshot();
+    expect(read('generated/kotlin/app/nested/Functions.kt')).toMatchSnapshot();
+    expect(read('generated/react/app/nested.ts')).toMatchSnapshot();
+  });
+});
+
 describe('clearkrypt emit', () => {
   it('emits only the requested target', async () => {
     const root = copyProject('hello-world');

@@ -122,6 +122,27 @@ exports[`parseSource - valid fixtures > parses syntax/native-binding.ck with zer
 "
 `;
 
+exports[`parseSource - valid fixtures > parses syntax/nested-functions.ck with zero diagnostics 1`] = `
+"SourceFile syntax/nested-functions.ck 1:1-27:1
+  Module app.nested 1:1-1:18
+  Function triangular(n: Int) -> Int 3:1-11:2
+    Function sumUpTo(current: Int) -> Int 4:3-9:4
+      If current <= 0 5:5-7:6
+        Return 0 6:7-6:15
+      Return current + sumUpTo(current: current - 1) 8:5-8:51
+    Return sumUpTo(current: n) 10:3-10:29
+  Function discountedTotal(base: Int, discountPercent: Int) -> Int 13:1-21:2
+    Function applyDiscount(amount: Int) -> Int 14:3-16:4
+      Return amount - amount * discountPercent / 100 15:5-15:52
+    Function addServiceFee(amount: Int) -> Int 17:3-19:4
+      Return amount + 5 18:5-18:22
+    Return addServiceFee(amount: applyDiscount(amount: base)) 20:3-20:60
+  Function describeTotal(base: Int, discountPercent: Int) -> String 23:1-26:2
+    Let total = discountedTotal(base: base, discountPercent: discountPercent) 24:3-24:76
+    Return "Total: \\(total)" 25:3-25:27
+"
+`;
+
 exports[`parseSource - valid fixtures > parses syntax/power-pack.ck with zero diagnostics 1`] = `
 "SourceFile syntax/power-pack.ck 1:1-73:1
   Module app.orders 1:1-1:18

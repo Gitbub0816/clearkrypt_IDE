@@ -197,6 +197,12 @@ Public functions should always have explicit return types.
 
 Local type inference may be allowed for simple `let` bindings.
 
+A `fn` may also be declared inside another function's body — a nested
+(local) function, scoped to that block, with its own return type and its own
+`throws` clause. It sees every enclosing parameter and local, and may call
+itself. Every backend target (Swift, Kotlin, TypeScript) supports nested
+functions with native scope capture, so this stays honest on every platform.
+
 ## 14. Async and throwing functions
 
 Async and failure behavior should be visible in the signature.
@@ -321,22 +327,29 @@ Attribute rules:
 
 ## 22. Comments and documentation
 
-Comments use standard line and block forms.
+Comments are word-based, not symbol-based: `comment` is a reserved word (never usable as an identifier) and it always starts a comment. This keeps comments readable at a glance, in keeping with the language's essay-like character, and needs no shift key or line-noise punctuation to write.
+
+Single-line comment — `comment:` runs to the end of the line:
 
 ```ck
-// line comment
-
-/* block comment */
+comment: explains the line or declaration that follows
 ```
 
-Documentation comments should be added with a clear syntax later, likely:
+Multi-line comment — a bare `comment` (no colon) opens a block that runs until a later `end comment`. `end comment` is matched as whole words, so ordinary prose inside the block is never mistaken for code:
 
 ```ck
-/// A user account in the application.
+comment
+Anything goes here, across as many lines as needed.
+Nothing inside is parsed as ClearKrypt code.
+end comment
+```
+
+Documentation comments reuse the single-line form, written immediately above the declaration they describe; the documentation generator recognizes a run of `comment:` lines directly preceding a declaration as that declaration's doc comment:
+
+```ck
+comment: A user account in the application.
 model User { }
 ```
-
-The documentation generator should use these comments.
 
 ## 23. Formatting law
 

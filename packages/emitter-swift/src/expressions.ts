@@ -9,6 +9,8 @@ import {
 } from '@clearkrypt/compiler-core';
 import { unsupportedFeature } from './diagnostics';
 import { swiftIdentifier } from './naming';
+import { renderSignatureLines } from './signature';
+import { renderReturnClause, renderType } from './types';
 
 const INDENT = '    ';
 
@@ -216,6 +218,29 @@ function renderStatement(
       return [`${pad}throw ${renderExpr(statement.value, origin, diagnostics)}`];
     case 'expr':
       return [`${pad}${renderExpr(statement.expression, origin, diagnostics)}`];
+    case 'localFunction': {
+      const fn = statement.function;
+      const paramTexts = fn.params.map((p) => {
+        const type = renderType(p.type, p.origin, diagnostics);
+        const defaultText =
+          p.defaultValue === undefined ? '' : ` = ${renderExpr(p.defaultValue, p.origin, diagnostics)}`;
+        return `${swiftIdentifier(p.name)}: ${type.text}${defaultText}`;
+      });
+      const returnClause = renderReturnClause(fn.returnType, fn.origin, diagnostics);
+      const modifiers = [fn.isAsync ? 'async' : undefined, fn.throwsType !== undefined ? 'throws' : undefined]
+        .filter((m): m is string => m !== undefined)
+        .map((m) => ` ${m}`)
+        .join('');
+      const lines = renderSignatureLines(
+        pad,
+        `func ${fn.name}`,
+        paramTexts,
+        `${modifiers}${returnClause.clause} {`,
+      );
+      lines.push(...renderStatements(fn.body, fn.origin, diagnostics, level + 1));
+      lines.push(`${pad}}`);
+      return lines;
+    }
     default: {
       diagnostics.push(
         unsupportedFeature(origin, `Unrecognized IR statement kind '${String((statement as { kind: string }).kind)}'`),

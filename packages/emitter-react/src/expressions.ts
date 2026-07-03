@@ -13,6 +13,8 @@ import { addValueImport, TsCtx } from './context';
 import { unsupportedFeature } from './diagnostics';
 import { lookupEnum, lookupModel } from './modelIndex';
 import { tsIdentifier } from './naming';
+import { renderSignatureLines } from './signature';
+import { renderType } from './types';
 
 const INDENT = '  ';
 
@@ -320,6 +322,22 @@ function renderStatement(statement: IrStatement, origin: IrOrigin, ctx: TsCtx, l
       return [`${pad}throw ${renderExpr(statement.value, origin, ctx)};`];
     case 'expr':
       return [`${pad}${renderExpr(statement.expression, origin, ctx)};`];
+    case 'localFunction': {
+      const fn = statement.function;
+      const paramTexts = fn.params.map((p) => {
+        const type = renderType(p.type, p.origin, ctx);
+        const defaultText =
+          p.defaultValue === undefined ? '' : ` = ${renderExpr(p.defaultValue, p.origin, ctx)}`;
+        return `${tsIdentifier(p.name)}: ${type}${defaultText}`;
+      });
+      const returnType = renderType(fn.returnType, fn.origin, ctx);
+      const returnClause = fn.isAsync ? `Promise<${returnType}>` : returnType;
+      const prefix = `${fn.isAsync ? 'async ' : ''}function ${fn.name}`;
+      const lines = renderSignatureLines(pad, prefix, paramTexts, `: ${returnClause} {`);
+      lines.push(...renderStatements(fn.body, fn.origin, ctx, level + 1));
+      lines.push(`${pad}}`);
+      return lines;
+    }
     default: {
       const unknownKind = (statement as { kind: string }).kind;
       ctx.diagnostics.push(unsupportedFeature(origin, `Unrecognized IR statement kind '${unknownKind}'`));

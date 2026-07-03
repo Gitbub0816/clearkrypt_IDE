@@ -286,6 +286,9 @@ function printStatement(stmt: Statement, depth: number, push: Push): void {
     case 'ExpressionStatement':
       push(depth, `Expr ${renderExpr(stmt.expression)} ${loc(stmt)}`);
       return;
+    case 'FunctionDecl':
+      printFunction(stmt, depth, push);
+      return;
   }
 }
 

@@ -5,6 +5,7 @@ import {
   parseSource,
   SourceFileInput,
   Span,
+  Statement,
   Token,
   TypeRef,
   UiElement,
@@ -176,6 +177,7 @@ class IdentifierClassifier {
           for (const capability of decl.requiresCapabilities) {
             this.put(capability.span, 'capability', 0);
           }
+          this.addNestedFunctions(decl.body.statements, checked);
         }
         break;
       case 'ScreenDecl':
@@ -199,6 +201,22 @@ class IdentifierClassifier {
           this.addTypeRef(binding.type, checked);
         }
         break;
+    }
+  }
+
+  /** Nested (local) function statements aren't top-level declarations, but they still declare a name, params, and types, so they get the same treatment, recursively (a local function can itself nest another). */
+  private addNestedFunctions(statements: readonly Statement[], checked: CheckedProject): void {
+    for (const statement of statements) {
+      if (statement.kind === 'FunctionDecl') {
+        this.addDeclaration(statement, checked);
+      } else if (statement.kind === 'IfStatement' || statement.kind === 'IfLetStatement') {
+        this.addNestedFunctions(statement.thenBlock.statements, checked);
+        if (statement.elseBlock) {
+          const elseStatements =
+            statement.elseBlock.kind === 'Block' ? statement.elseBlock.statements : [statement.elseBlock];
+          this.addNestedFunctions(elseStatements, checked);
+        }
+      }
     }
   }
 

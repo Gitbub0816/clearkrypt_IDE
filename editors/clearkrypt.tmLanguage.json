@@ -18,8 +18,12 @@
   "repository": {
     "comments": {
       "patterns": [
-        { "name": "comment.line.double-slash.clearkrypt", "match": "//.*$" },
-        { "name": "comment.block.clearkrypt", "begin": "/\\*", "end": "\\*/" }
+        { "name": "comment.line.clearkrypt", "match": "\\bcomment:.*$" },
+        {
+          "name": "comment.block.clearkrypt",
+          "begin": "\\bcomment\\b(?!:)",
+          "end": "\\bend\\s+comment\\b"
+        }
       ]
     },
     "strings": {

@@ -205,7 +205,9 @@ export type Statement =
   | IfStatement
   | IfLetStatement
   | ThrowStatement
-  | ExpressionStatement;
+  | ExpressionStatement
+  /** A local (nested) function declaration, valid as a statement inside any block. */
+  | FunctionDecl;
 
 export interface Block extends AstNode {
   readonly kind: 'Block';

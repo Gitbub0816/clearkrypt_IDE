@@ -43,6 +43,26 @@ exports[`lowerProject - IR snapshots > lowers hello-world 1`] = `
 "
 `;
 
+exports[`lowerProject - IR snapshots > lowers nested (local) functions, including self-recursion and capture 1`] = `
+"Module app.nested (syntax/nested-functions.ck)
+  Function triangular(n: Int) -> Int
+    Function sumUpTo(current: Int) -> Int
+      If (param(current) : Int <= 0 : Int) : Bool
+        Return 0 : Int
+      Return (param(current) : Int + call app.nested.sumUpTo(current: (param(current) : Int - 1 : Int) : Int) : Int) : Int
+    Return call app.nested.sumUpTo(current: param(n) : Int) : Int
+  Function discountedTotal(base: Int, discountPercent: Int) -> Int
+    Function applyDiscount(amount: Int) -> Int
+      Return (param(amount) : Int - ((param(amount) : Int * param(discountPercent) : Int) : Int / 100 : Int) : Int) : Int
+    Function addServiceFee(amount: Int) -> Int
+      Return (param(amount) : Int + 5 : Int) : Int
+    Return call app.nested.addServiceFee(amount: call app.nested.applyDiscount(amount: param(base) : Int) : Int) : Int
+  Function describeTotal(base: Int, discountPercent: Int) -> String
+    Let total: Int = call app.nested.discountedTotal(base: param(base) : Int, discountPercent: param(discountPercent) : Int) : Int
+    Return interp("Total: \\(local(total) : Int)") : String
+"
+`;
+
 exports[`lowerProject - IR snapshots > lowers the power pack: match, optionals, interpolation, throw, try 1`] = `
 "Module app.orders (syntax/power-pack.ck)
   Enum OrderStatus (simple)

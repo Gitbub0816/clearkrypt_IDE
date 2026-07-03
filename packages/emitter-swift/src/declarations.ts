@@ -7,6 +7,7 @@ import {
   IrFunction,
   IrModel,
   IrParam,
+  IrStatement,
 } from '@clearkrypt/compiler-core';
 import { renderExpr, renderStatements } from './expressions';
 import { renderSignatureLines } from './signature';
@@ -94,6 +95,26 @@ function renderParam(param: IrParam, diagnostics: Diagnostic[]): { text: string;
   return { text: `${name}: ${type.text}${defaultText}`, needsFoundation: type.needsFoundation };
 }
 
+/**
+ * Nested function declarations (Swift local `func`) render their own
+ * signatures too, so a local function using `Date`/`Data`/`URL`/`Decimal`
+ * must still trigger the enclosing file's `import Foundation` even though
+ * its signature is rendered deep inside a statement list, not by this
+ * function directly.
+ */
+function collectLocalFunctions(statements: readonly IrStatement[]): readonly IrFunction[] {
+  const result: IrFunction[] = [];
+  for (const statement of statements) {
+    if (statement.kind === 'localFunction') {
+      result.push(statement.function, ...collectLocalFunctions(statement.function.body));
+    } else if (statement.kind === 'if' || statement.kind === 'ifLet') {
+      result.push(...collectLocalFunctions(statement.then));
+      if (statement.else) result.push(...collectLocalFunctions(statement.else));
+    }
+  }
+  return result;
+}
+
 export function renderFunction(fn: IrFunction, diagnostics: Diagnostic[]): RenderedDecl {
   let needsFoundation = false;
   const paramTexts: string[] = [];
@@ -105,6 +126,16 @@ export function renderFunction(fn: IrFunction, diagnostics: Diagnostic[]): Rende
 
   const returnClause = renderReturnClause(fn.returnType, fn.origin, diagnostics);
   needsFoundation = mergeFoundation(needsFoundation, returnClause.needsFoundation);
+
+  for (const nested of collectLocalFunctions(fn.body)) {
+    for (const param of nested.params) {
+      needsFoundation = mergeFoundation(needsFoundation, renderParam(param, diagnostics).needsFoundation);
+    }
+    needsFoundation = mergeFoundation(
+      needsFoundation,
+      renderReturnClause(nested.returnType, nested.origin, diagnostics).needsFoundation,
+    );
+  }
 
   const modifiers = [fn.isAsync ? 'async' : undefined, fn.throwsType !== undefined ? 'throws' : undefined]
     .filter((m): m is string => m !== undefined)

@@ -69,6 +69,20 @@ function isDigit(code: number): boolean {
   return code >= 48 && code <= 57;
 }
 
+/** Whitespace allowed between `end` and `comment` when closing a block comment. */
+function isCommentWhitespace(code: number): boolean {
+  return code === 32 || code === 9 || code === 13 || code === 10;
+}
+
+/** True when `word` occurs at `pos` as a whole word (not a prefix/suffix of a longer identifier). */
+function matchesWord(text: string, pos: number, word: string): boolean {
+  if (!text.startsWith(word, pos)) return false;
+  if (pos > 0 && isIdentifierPart(text.charCodeAt(pos - 1))) return false;
+  const after = pos + word.length;
+  if (after < text.length && isIdentifierPart(text.charCodeAt(after))) return false;
+  return true;
+}
+
 /**
  * Decodes a raw `StringLiteral` token's source text into its runtime value,
  * resolving `\" \\ \n \t \r` escapes. Shares the lexer's escape rules so a
@@ -222,34 +236,42 @@ export function lex(source: SourceFileInput, options: LexOptions = {}): LexResul
       continue;
     }
 
-    // Line comment.
-    if (code === 47 /* / */ && text.charCodeAt(pos + 1) === 47) {
-      pos += 2;
-      while (pos < length && text.charCodeAt(pos) !== 10) {
-        pos++;
+    // Comments. `comment` is a fully reserved word, never an identifier:
+    // `comment: text` runs to end of line; a bare `comment` opens a block
+    // that runs until a later `end comment` (word-bounded, so `commenting`
+    // or `weekend comments` never match).
+    if (isIdentifierStart(code) && matchesWord(text, pos, 'comment')) {
+      const wordEnd = pos + 'comment'.length;
+      if (text.charCodeAt(wordEnd) === 58 /* : */) {
+        pos = wordEnd + 1;
+        while (pos < length && text.charCodeAt(pos) !== 10) {
+          pos++;
+        }
+        if (includeTrivia) {
+          push('LineComment', start, pos);
+        }
+        continue;
       }
-      if (includeTrivia) {
-        push('LineComment', start, pos);
-      }
-      continue;
-    }
-
-    // Block comment (non-nesting).
-    if (code === 47 && text.charCodeAt(pos + 1) === 42 /* * */) {
-      pos += 2;
+      pos = wordEnd;
       let terminated = false;
       while (pos < length) {
-        if (text.charCodeAt(pos) === 42 && text.charCodeAt(pos + 1) === 47) {
-          pos += 2;
-          terminated = true;
-          break;
+        if (matchesWord(text, pos, 'end')) {
+          let cursor = pos + 'end'.length;
+          while (cursor < length && isCommentWhitespace(text.charCodeAt(cursor))) {
+            cursor++;
+          }
+          if (matchesWord(text, cursor, 'comment')) {
+            pos = cursor + 'comment'.length;
+            terminated = true;
+            break;
+          }
         }
         pos++;
       }
       if (!terminated) {
         report(
           DiagnosticCodes.UnterminatedBlockComment,
-          "Unterminated block comment. Add a closing '*/' to end the comment that starts here.",
+          "Unterminated block comment. Add a closing 'end comment' to end the comment that starts here.",
           spanOf(start, pos),
         );
       }

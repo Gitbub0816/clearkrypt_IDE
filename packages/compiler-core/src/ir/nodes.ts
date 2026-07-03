@@ -265,7 +265,14 @@ export interface IrUnary {
 // Statements
 // ---------------------------------------------------------------------------
 
-export type IrStatement = IrLet | IrReturn | IrIf | IrIfLet | IrThrow | IrExpressionStatement;
+export type IrStatement =
+  | IrLet
+  | IrReturn
+  | IrIf
+  | IrIfLet
+  | IrThrow
+  | IrExpressionStatement
+  | IrLocalFunction;
 
 export interface IrLet {
   readonly kind: 'let';
@@ -306,6 +313,17 @@ export interface IrThrow {
 export interface IrExpressionStatement {
   readonly kind: 'expr';
   readonly expression: IrExpression;
+}
+
+/**
+ * A nested (local) function declared as a statement. Shares `IrFunction`'s
+ * shape exactly: emitters render it as a Swift local `func`, a Kotlin local
+ * `fun`, or a TS nested `function`, all of which natively support capturing
+ * the enclosing scope, so lowering needs nothing special for closures.
+ */
+export interface IrLocalFunction {
+  readonly kind: 'localFunction';
+  readonly function: IrFunction;
 }
 
 // ---------------------------------------------------------------------------

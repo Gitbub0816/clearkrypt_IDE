@@ -1,6 +1,7 @@
 import {
   IrDeclaration,
   IrExpression,
+  IrFunction,
   IrProject,
   IrStatement,
   IrType,
@@ -39,18 +40,21 @@ function printDeclaration(decl: IrDeclaration, lines: string[]): void {
         lines.push(`    Case ${c.name}${params ? `(${params})` : ''}`);
       }
       break;
-    case 'function': {
-      const params = decl.params.map((p) => `${p.name}: ${printType(p.type)}`).join(', ');
-      const asyncPart = decl.isAsync ? ' async' : '';
-      const throwsPart = decl.throwsType ? ` throws ${decl.throwsType.name}` : '';
-      lines.push(
-        `  Function ${decl.name}(${params})${asyncPart}${throwsPart} -> ${printType(decl.returnType)}`,
-      );
-      for (const statement of decl.body) {
-        printStatement(statement, lines, '    ');
-      }
+    case 'function':
+      printFunction(decl, lines, '  ', '    ');
       break;
-    }
+  }
+}
+
+function printFunction(fn: IrFunction, lines: string[], headIndent: string, bodyIndent: string): void {
+  const params = fn.params.map((p) => `${p.name}: ${printType(p.type)}`).join(', ');
+  const asyncPart = fn.isAsync ? ' async' : '';
+  const throwsPart = fn.throwsType ? ` throws ${fn.throwsType.name}` : '';
+  lines.push(
+    `${headIndent}Function ${fn.name}(${params})${asyncPart}${throwsPart} -> ${printType(fn.returnType)}`,
+  );
+  for (const statement of fn.body) {
+    printStatement(statement, lines, bodyIndent);
   }
 }
 
@@ -89,6 +93,9 @@ function printStatement(statement: IrStatement, lines: string[], indent: string)
       break;
     case 'expr':
       lines.push(`${indent}Expr ${printExpression(statement.expression)}`);
+      break;
+    case 'localFunction':
+      printFunction(statement.function, lines, indent, indent + '  ');
       break;
   }
 }

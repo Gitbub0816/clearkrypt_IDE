@@ -102,6 +102,14 @@ interface FunctionContext {
   readonly throwsType?: SemType;
   /** Innermost scope last. Scope 0 holds parameters. */
   readonly scopes: Map<string, { type: SemType; kind: 'local' | 'param' }>[];
+  /**
+   * Local (nested) function declarations visible at each block depth,
+   * innermost last, parallel to `scopes`. A synthesized `DeclarationSymbol`
+   * per entry lets local calls reuse the same resolution and lowering path
+   * as top-level function calls (Constitution Document 5: one resolution
+   * pipeline, not a parallel one for a "lesser" feature).
+   */
+  readonly localFunctions: Map<string, DeclarationSymbol>[];
   /** Import + module scope for the enclosing file. */
   readonly fileScope: FileScope;
 }
@@ -653,6 +661,7 @@ class Checker {
       returnType,
       throwsType,
       scopes: [new Map([...params].map(([name, type]) => [name, { type, kind: 'param' as const }]))],
+      localFunctions: [new Map()],
       fileScope: scope,
     };
     const definitelyReturns = this.checkBlock(decl.body, ctx);
@@ -675,6 +684,7 @@ class Checker {
     const ctx: FunctionContext = {
       returnType: primitiveType('Void'),
       scopes: [new Map([...params].map(([name, type]) => [name, { type, kind: 'param' as const }]))],
+      localFunctions: [new Map()],
       fileScope: scope,
     };
     for (const element of decl.body) {
@@ -757,6 +767,7 @@ class Checker {
   /** Checks a block in a fresh child scope. Returns whether it definitely returns. */
   private checkBlock(block: Block, ctx: FunctionContext): boolean {
     ctx.scopes.push(new Map());
+    ctx.localFunctions.push(new Map());
     let definitelyReturns = false;
     for (const statement of block.statements) {
       if (this.checkStatement(statement, ctx)) {
@@ -764,6 +775,7 @@ class Checker {
       }
     }
     ctx.scopes.pop();
+    ctx.localFunctions.pop();
     return definitelyReturns;
   }
 
@@ -771,6 +783,7 @@ class Checker {
     switch (statement.kind) {
       case 'LetStatement': {
         const name = statement.name.text;
+        const shadowedFunction = this.lookupLocalFunction(name, ctx);
         for (const scope of ctx.scopes) {
           const existing = scope.get(name);
           if (existing) {
@@ -783,6 +796,15 @@ class Checker {
             );
             break;
           }
+        }
+        if (shadowedFunction) {
+          this.report(
+            DiagnosticCodes.DuplicateDeclaration,
+            'error',
+            `'${name}' is already a local function in this scope. Choose a different name.`,
+            statement.name.span,
+            { related: [{ message: 'First declared here.', span: shadowedFunction.nameSpan }] },
+          );
         }
         const initializerType =
           statement.initializer.kind === 'Match'
@@ -922,7 +944,123 @@ class Checker {
         this.checkExpression(statement.expression, ctx);
         return false;
       }
+      case 'FunctionDecl':
+        this.checkLocalFunction(statement, ctx);
+        return false;
     }
+  }
+
+  /**
+   * Checks a nested (local) function declared as a statement. It behaves
+   * like a top-level function — its own return/throws type, its own missing-
+   * return check — but its body sees every enclosing scope (real capture),
+   * and it is registered for calls (including self-recursion) before its own
+   * body is checked.
+   */
+  private checkLocalFunction(decl: FunctionDecl, ctx: FunctionContext): void {
+    const name = decl.name.text;
+    const shadowedBinding = this.firstShadowedBinding(name, ctx);
+    if (shadowedBinding) {
+      this.report(
+        DiagnosticCodes.DuplicateDeclaration,
+        'error',
+        `'${name}' is already ${shadowedBinding === 'param' ? 'a parameter' : 'declared'} ` +
+          `in this function. Choose a different name.`,
+        decl.name.span,
+      );
+    }
+    const shadowedFunction = this.lookupLocalFunction(name, ctx);
+    if (shadowedFunction) {
+      this.report(
+        DiagnosticCodes.DuplicateDeclaration,
+        'error',
+        `A local function named '${name}' is already declared in this scope.`,
+        decl.name.span,
+        { related: [{ message: 'First declared here.', span: shadowedFunction.nameSpan }] },
+      );
+    }
+
+    const { params, returnType } = this.checkFunctionSignature(decl, ctx.fileScope);
+    const throwsType = decl.throwsType ? this.typeRefTypes.get(decl.throwsType) : undefined;
+    for (const cap of decl.requiresCapabilities) {
+      const symbol = ctx.fileScope.module.declarations.get(cap.text) ?? ctx.fileScope.imports.get(cap.text);
+      if (!symbol) {
+        this.report(
+          DiagnosticCodes.UnknownSymbol,
+          'error',
+          `Unknown capability '${cap.text}'. Declare it with 'capability ${cap.text}' or import it.`,
+          cap.span,
+        );
+      } else if (symbol.kind !== 'capability') {
+        this.report(
+          DiagnosticCodes.TypeMismatch,
+          'error',
+          `'${cap.text}' is a ${symbol.kind}; a requires clause needs a capability.`,
+          cap.span,
+        );
+      }
+    }
+
+    // Registered before the body is checked, so the function can call itself
+    // (and siblings declared earlier in this scope can already see it once
+    // its own turn comes, matching how 'let' bindings are sequential too).
+    const localSymbol: DeclarationSymbol = {
+      name,
+      kind: 'function',
+      module: ctx.fileScope.module.name,
+      nameSpan: decl.name.span,
+      node: decl,
+    };
+    if (!shadowedFunction) {
+      ctx.localFunctions[ctx.localFunctions.length - 1]!.set(name, localSymbol);
+    }
+
+    const paramScope = new Map(
+      [...params].map(([paramName, type]) => [paramName, { type, kind: 'param' as const }]),
+    );
+    ctx.scopes.push(paramScope);
+    ctx.localFunctions.push(new Map());
+    const nestedCtx: FunctionContext = {
+      returnType,
+      throwsType,
+      scopes: ctx.scopes,
+      localFunctions: ctx.localFunctions,
+      fileScope: ctx.fileScope,
+    };
+    const definitelyReturns = this.checkBlock(decl.body, nestedCtx);
+    ctx.scopes.pop();
+    ctx.localFunctions.pop();
+
+    const wantsValue =
+      !(returnType.kind === 'primitive' && (returnType.name === 'Void' || returnType.name === 'Never'));
+    if (wantsValue && !definitelyReturns && returnType.kind !== 'error') {
+      this.report(
+        DiagnosticCodes.MissingReturn,
+        'error',
+        `Function '${name}' declares return type '${typeToString(returnType)}' but not every ` +
+          `path returns a value. Add a return statement (an if needs an else when it is the ` +
+          `last statement).`,
+        decl.name.span,
+      );
+    }
+  }
+
+  /** Innermost-first lookup of a local (nested) function's synthesized symbol. */
+  private lookupLocalFunction(name: string, ctx: FunctionContext): DeclarationSymbol | undefined {
+    for (let i = ctx.localFunctions.length - 1; i >= 0; i--) {
+      const found = ctx.localFunctions[i]!.get(name);
+      if (found) return found;
+    }
+    return undefined;
+  }
+
+  /** Innermost-first lookup of a plain local/param binding's kind, for duplicate diagnostics. */
+  private firstShadowedBinding(name: string, ctx: FunctionContext): 'local' | 'param' | undefined {
+    for (const scope of ctx.scopes) {
+      const existing = scope.get(name);
+      if (existing) return existing.kind;
+    }
+    return undefined;
   }
 
   // -- Expressions ---------------------------------------------------------------
@@ -1081,7 +1219,9 @@ class Checker {
       }
     }
     const symbol =
-      ctx.fileScope.module.declarations.get(expr.name) ?? ctx.fileScope.imports.get(expr.name);
+      this.lookupLocalFunction(expr.name, ctx) ??
+      ctx.fileScope.module.declarations.get(expr.name) ??
+      ctx.fileScope.imports.get(expr.name);
     if (symbol && (symbol.kind === 'function' || symbol.kind === 'native')) {
       this.report(
         DiagnosticCodes.TypeMismatch,
@@ -1139,7 +1279,9 @@ class Checker {
     }
     const name = expr.callee.name;
     const symbol =
-      ctx.fileScope.module.declarations.get(name) ?? ctx.fileScope.imports.get(name);
+      this.lookupLocalFunction(name, ctx) ??
+      ctx.fileScope.module.declarations.get(name) ??
+      ctx.fileScope.imports.get(name);
     if (!symbol) {
       this.report(
         DiagnosticCodes.UnknownSymbol,
@@ -1802,7 +1944,12 @@ class Checker {
 }
 
 function emptyFunctionContext(scope: FileScope): FunctionContext {
-  return { returnType: primitiveType('Void'), scopes: [new Map()], fileScope: scope };
+  return {
+    returnType: primitiveType('Void'),
+    scopes: [new Map()],
+    localFunctions: [new Map()],
+    fileScope: scope,
+  };
 }
 
 function symbolKindOf(decl: Declaration): SymbolKind {

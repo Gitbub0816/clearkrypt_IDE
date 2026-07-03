@@ -82,16 +82,41 @@ public struct SyntaxHighlighter {
         func isDigit(_ unit: UInt16) -> Bool {
             unit >= 48 && unit <= 57
         }
+        func isWhitespace(_ unit: UInt16) -> Bool {
+            unit == 32 || unit == 9 || unit == 13
+        }
+        // `comment` is reserved and always starts a comment; matched as a
+        // whole word (not a prefix/suffix of a longer identifier) so
+        // `commenting` or `recommend` are untouched.
+        func matchesWord(_ word: String, at position: Int) -> Bool {
+            let unitsArr = Array(word.utf16)
+            guard position + unitsArr.count <= characters.count else { return false }
+            for i in 0..<unitsArr.count where characters[position + i] != unitsArr[i] { return false }
+            if position > 0, isLetter(characters[position - 1]) || isDigit(characters[position - 1]) {
+                return false
+            }
+            let after = position + unitsArr.count
+            if after < characters.count, isLetter(characters[after]) || isDigit(characters[after]) {
+                return false
+            }
+            return true
+        }
 
         while index < characters.count {
             if inBlockComment {
-                // Scan for the terminator; the whole scanned run is a comment.
+                // Scan for `end comment` (word-bounded); the whole scanned run is a comment.
                 let start = index
                 while index < characters.count {
-                    if characters[index] == 42, index + 1 < characters.count, characters[index + 1] == 47 {
-                        index += 2
-                        inBlockComment = false
-                        break
+                    if matchesWord("end", at: index) {
+                        var cursor = index + 3
+                        while cursor < characters.count, isWhitespace(characters[cursor]) {
+                            cursor += 1
+                        }
+                        if matchesWord("comment", at: cursor) {
+                            index = cursor + 7
+                            inBlockComment = false
+                            break
+                        }
                     }
                     index += 1
                 }
@@ -101,21 +126,26 @@ public struct SyntaxHighlighter {
 
             let unit = characters[index]
 
-            // Line comment.
-            if unit == 47, index + 1 < characters.count, characters[index + 1] == 47 {
-                emit(index, characters.count - index, .comment)
-                return
-            }
-            // Block comment start.
-            if unit == 47, index + 1 < characters.count, characters[index + 1] == 42 {
+            // `comment` keyword: line form (`comment:`) or block form (bare `comment`).
+            if isLetter(unit), matchesWord("comment", at: index) {
+                if index + 7 < characters.count, characters[index + 7] == 58 /* : */ {
+                    emit(index, characters.count - index, .comment)
+                    return
+                }
                 inBlockComment = true
                 let start = index
-                index += 2
+                index += 7
                 while index < characters.count {
-                    if characters[index] == 42, index + 1 < characters.count, characters[index + 1] == 47 {
-                        index += 2
-                        inBlockComment = false
-                        break
+                    if matchesWord("end", at: index) {
+                        var cursor = index + 3
+                        while cursor < characters.count, isWhitespace(characters[cursor]) {
+                            cursor += 1
+                        }
+                        if matchesWord("comment", at: cursor) {
+                            index = cursor + 7
+                            inBlockComment = false
+                            break
+                        }
                     }
                     index += 1
                 }

@@ -225,12 +225,12 @@ class Lowerer {
       returnType,
       isAsync: decl.isAsync,
       throwsType,
-      body: decl.body.statements.map((s) => this.lowerStatement(s)),
+      body: decl.body.statements.map((s) => this.lowerStatement(s, moduleName, file)),
       origin: this.origin(moduleName, file, decl.span),
     };
   }
 
-  private lowerStatement(statement: Statement): IrStatement {
+  private lowerStatement(statement: Statement, moduleName: string, file: string): IrStatement {
     switch (statement.kind) {
       case 'LetStatement':
         return {
@@ -249,8 +249,8 @@ class Lowerer {
         return {
           kind: 'if',
           condition: this.lowerExpression(statement.condition),
-          then: statement.thenBlock.statements.map((s) => this.lowerStatement(s)),
-          else: this.lowerElseBranch(statement.elseBlock),
+          then: statement.thenBlock.statements.map((s) => this.lowerStatement(s, moduleName, file)),
+          else: this.lowerElseBranch(statement.elseBlock, moduleName, file),
         };
       case 'IfLetStatement': {
         const valueType = this.typeOf(statement.value);
@@ -259,25 +259,29 @@ class Lowerer {
           name: statement.name.text,
           type: valueType.kind === 'optional' ? valueType.inner : valueType,
           value: this.lowerExpression(statement.value),
-          then: statement.thenBlock.statements.map((s) => this.lowerStatement(s)),
-          else: this.lowerElseBranch(statement.elseBlock),
+          then: statement.thenBlock.statements.map((s) => this.lowerStatement(s, moduleName, file)),
+          else: this.lowerElseBranch(statement.elseBlock, moduleName, file),
         };
       }
       case 'ThrowStatement':
         return { kind: 'throw', value: this.lowerExpression(statement.value) };
       case 'ExpressionStatement':
         return { kind: 'expr', expression: this.lowerExpression(statement.expression) };
+      case 'FunctionDecl':
+        return { kind: 'localFunction', function: this.lowerFunction(statement, moduleName, file) };
     }
   }
 
   private lowerElseBranch(
     elseBlock: IfStatement['elseBlock'],
+    moduleName: string,
+    file: string,
   ): IrStatement[] | undefined {
     if (!elseBlock) return undefined;
     if (elseBlock.kind === 'IfStatement' || elseBlock.kind === 'IfLetStatement') {
-      return [this.lowerStatement(elseBlock)];
+      return [this.lowerStatement(elseBlock, moduleName, file)];
     }
-    return elseBlock.statements.map((s) => this.lowerStatement(s));
+    return elseBlock.statements.map((s) => this.lowerStatement(s, moduleName, file));
   }
 
   private lowerExpression(expr: Expression): IrExpression {

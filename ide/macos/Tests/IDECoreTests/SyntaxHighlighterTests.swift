@@ -24,17 +24,22 @@ final class SyntaxHighlighterTests: XCTestCase {
     }
 
     func testLineCommentsSwallowTrailingCode() {
-        let spans = kinds("let x = 1 // model not-a-keyword\n")
-        XCTAssertTrue(spans.contains(where: { $0.0.hasPrefix("// model") && $0.1 == .comment }))
+        let spans = kinds("let x = 1 comment: model not-a-keyword\n")
+        XCTAssertTrue(spans.contains(where: { $0.0.hasPrefix("comment: model") && $0.1 == .comment }))
         XCTAssertFalse(spans.contains(where: { $0.0 == "not" }))
     }
 
     func testBlockCommentSpanningThreeLines() {
-        let text = "let a = 1\n/* one\ntwo\nthree */ let b = 2\n"
+        let text = "let a = 1\ncomment one\ntwo\nthree end comment let b = 2\n"
         let spans = kinds(text)
         let comments = spans.filter { $0.1 == .comment }
-        XCTAssertEqual(comments.count, 3) // "/* one", "two", "three */" scanned per line
+        XCTAssertEqual(comments.count, 3) // "comment one", "two", "three end comment" scanned per line
         XCTAssertTrue(spans.contains(where: { $0.0 == "let" && $0.1 == .keyword }))
+    }
+
+    func testCommentKeywordIsNeverAnIdentifier() {
+        let spans = kinds("let commenting = recommend\n")
+        XCTAssertFalse(spans.contains(where: { $0.1 == .comment }))
     }
 
     func testStringContainingSlashesIsNotAComment() {

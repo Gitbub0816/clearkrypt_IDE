@@ -11,6 +11,7 @@
 Shipped and snapshot-tested across Swift, Kotlin, and TypeScript:
 
 - models, enums with payloads, typed errors, functions
+- nested (local) functions with real lexical capture and self-recursion
 - string interpolation
 - `match` with compiler-proven exhaustiveness and payload binding
 - first-class optionals: `?.`, `??`, `if let`

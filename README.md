@@ -58,10 +58,12 @@ clearkrypt new hello && cd hello && clearkrypt build
   diagnostics, semantic model, and target-neutral IR — all snapshot-tested.
 - **Language power**: string interpolation, `match` expressions with
   compiler-proven exhaustiveness and payload binding, first-class optionals
-  (`?.`, `??`, `if let`), enum case constructors, and typed `throw`/`try`
-  propagation — each emitted idiomatically per target (Swift `switch`
-  expressions, Kotlin `when` + elvis + smart casts, TypeScript exhaustive
-  switches + narrowing). See `docs/22-power-roadmap.md` for what's next.
+  (`?.`, `??`, `if let`), enum case constructors, typed `throw`/`try`
+  propagation, and nested (local) functions with real lexical capture and
+  self-recursion — each emitted idiomatically per target (Swift `switch`
+  expressions and local `func`, Kotlin `when` + elvis + smart casts and local
+  `fun`, TypeScript exhaustive switches + narrowing and nested `function`).
+  See `docs/22-power-roadmap.md` for what's next.
 - **Emitters** (`packages/emitter-*`): models, simple and associated enums,
   typed errors, and pure/async functions as idiomatic, deterministic,
   byte-stable Swift, Kotlin, and TypeScript.

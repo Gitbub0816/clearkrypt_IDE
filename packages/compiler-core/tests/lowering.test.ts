@@ -47,6 +47,11 @@ describe('lowerProject - IR snapshots', () => {
     expect(printIr(result.project)).toMatchSnapshot();
   });
 
+  it('lowers nested (local) functions, including self-recursion and capture', () => {
+    const result = lowerFixtures(['syntax/nested-functions.ck']);
+    expect(printIr(result.project)).toMatchSnapshot();
+  });
+
   it('lowers enums and computes isSimple', () => {
     const result = lowerFixtures(['syntax/enum-only.ck', 'syntax/enum-associated.ck']);
     const modules = result.project.modules;

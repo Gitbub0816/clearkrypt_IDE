@@ -144,7 +144,7 @@ describe('lex', () => {
     });
 
     it('CK1005: reports an unterminated block comment', () => {
-      const { diagnostics } = lex({ path: 't.ck', text: '/* never closed\nstill going' });
+      const { diagnostics } = lex({ path: 't.ck', text: 'comment\nnever closed\nstill going' });
       expect(diagnostics).toHaveLength(1);
       expect(diagnostics[0]?.code).toBe('CK1005');
     });
@@ -152,15 +152,40 @@ describe('lex', () => {
 
   describe('trivia', () => {
     it('skips comments by default', () => {
-      const { tokens } = lex({ path: 't.ck', text: '// hello\nmodel /* mid */ Foo' });
+      const { tokens } = lex({ path: 't.ck', text: 'comment: hello\nmodel comment mid end comment Foo' });
       expect(tokens.map((t) => t.kind)).toEqual(['KwModel', 'Identifier', 'EndOfFile']);
     });
 
     it('emits LineComment and BlockComment tokens when includeTrivia is set', () => {
-      const { tokens } = lex({ path: 't.ck', text: '// hello\n/* world */\nmodel' }, { includeTrivia: true });
+      const { tokens } = lex(
+        { path: 't.ck', text: 'comment: hello\ncomment\nworld\nend comment\nmodel' },
+        { includeTrivia: true },
+      );
       expect(tokens.map((t) => t.kind)).toEqual(['LineComment', 'BlockComment', 'KwModel', 'EndOfFile']);
-      expect(tokens[0]?.text).toBe('// hello');
-      expect(tokens[1]?.text).toBe('/* world */');
+      expect(tokens[0]?.text).toBe('comment: hello');
+      expect(tokens[1]?.text).toBe('comment\nworld\nend comment');
+    });
+
+    it('never treats "comment" as an ordinary identifier, even mid-expression', () => {
+      const { tokens } = lex({ path: 't.ck', text: 'let x = 1 comment: trailing note' });
+      expect(tokens.map((t) => t.kind)).toEqual([
+        'KwLet',
+        'Identifier',
+        'Equals',
+        'IntLiteral',
+        'EndOfFile',
+      ]);
+    });
+
+    it('does not treat "commenting" or "recommend end comment" as comment keywords', () => {
+      const { tokens } = lex({ path: 't.ck', text: 'let commenting = recommend' });
+      expect(tokens.map((t) => t.kind)).toEqual([
+        'KwLet',
+        'Identifier',
+        'Equals',
+        'Identifier',
+        'EndOfFile',
+      ]);
     });
   });
 });

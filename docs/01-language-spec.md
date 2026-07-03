@@ -53,12 +53,16 @@ Wildcard imports should be avoided in MVP. They can be added later if tooling ca
 
 ## Comments
 
-```ck
-// Single-line comment
+`comment` is a reserved word; it always starts a comment and can never be used
+as an identifier. `comment:` runs to the end of the line. A bare `comment`
+opens a block that runs until a later `end comment` (matched as whole words):
 
-/*
+```ck
+comment: Single-line comment
+
+comment
 Multi-line comment
-*/
+end comment
 ```
 
 ## Primitive types
@@ -158,6 +162,31 @@ MVP functions should support:
 - Local `let` bindings.
 - Basic expressions.
 - Calls to other functions.
+
+### Nested (local) functions
+
+`fn` is valid as a statement inside any block, declaring a function local to
+that scope:
+
+```ck
+fn triangular(n: Int) -> Int {
+  fn sumUpTo(current: Int) -> Int {
+    if current <= 0 {
+      return 0
+    }
+    return current + sumUpTo(current: current - 1)
+  }
+  return sumUpTo(current: n)
+}
+```
+
+A local function has its own return type and its own `throws` clause, may
+call itself (self-recursion), and reads every enclosing parameter and local —
+real lexical capture, not a copy — because Swift, Kotlin, and TypeScript all
+give nested functions this behavior natively. A local function may itself
+declare further nested functions, to any depth. It cannot be referenced as a
+value (functions are not values in this version, matching top-level
+functions); it can only be called.
 
 ## Mutability
 
@@ -391,7 +420,9 @@ dir = "generated"
 
 Initial reserved words:
 
-`module`, `import`, `model`, `enum`, `fn`, `screen`, `component`, `route`, `effect`, `capability`, `requires`, `error`, `native`, `swift`, `kotlin`, `typescript`, `react`, `let`, `var`, `if`, `else`, `for`, `in`, `while`, `match`, `return`, `throw`, `throws`, `try`, `catch`, `async`, `true`, `false`, `null`, `public`, `private`, `internal`.
+`module`, `import`, `model`, `enum`, `fn`, `screen`, `component`, `route`, `effect`, `capability`, `requires`, `error`, `native`, `swift`, `kotlin`, `typescript`, `react`, `let`, `var`, `if`, `else`, `for`, `in`, `while`, `match`, `return`, `throw`, `throws`, `try`, `catch`, `async`, `true`, `false`, `null`, `public`, `private`, `internal`, `comment`.
+
+`comment` is reserved outright (see Comments, above): it is never available as an identifier, field name, or parameter name, because it always opens a comment.
 
 ## MVP syntax acceptance
 

@@ -147,6 +147,21 @@ Model construction (`User(id: x, name: y)`) emits:
 - **TypeScript**: `{ id: x, name: y }` object literal (checked against the
   interface).
 
+Nested (local) functions — `fn` as a statement inside any block — reuse the
+exact same signature and call rendering as top-level functions, indented in
+place:
+
+- **Swift**: a local `func`, which captures the enclosing scope natively.
+- **Kotlin**: a local `fun`, which captures the enclosing scope natively.
+- **TypeScript**: a nested `function`, which captures the enclosing scope
+  natively (a closure).
+
+No target needs special machinery for the capture itself; each of the three
+languages already gives nested functions access to their enclosing scope.
+Self-recursive and mutually-referential calls between local functions resolve
+through the same call-resolution path as top-level calls (same module, so no
+cross-module import is added).
+
 ## Expression and control-flow mappings
 
 | ClearKrypt | Swift | Kotlin | TypeScript |
