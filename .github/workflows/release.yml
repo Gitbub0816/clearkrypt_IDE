@@ -45,13 +45,15 @@ jobs:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v5
+      - name: Select the newest Xcode on the runner
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)/Contents/Developer"
       - run: brew install xcodegen
-      - run: xcodegen --spec ide/macos/project.yml
+      - run: xcodegen --spec ide/macos/project.yml --project ide/macos
       - run: >
           xcodebuild -project ide/macos/ClearKryptIDE.xcodeproj
           -scheme ClearKryptIDE -configuration Release
           -derivedDataPath ide/macos/build
-          CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build
+          CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO build
       - name: Zip app
         run: |
           cd ide/macos/build/Build/Products/Release
