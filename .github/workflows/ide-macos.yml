@@ -1,0 +1,40 @@
+name: macOS IDE
+
+on:
+  push:
+    paths:
+      - 'ide/macos/**'
+      - '.github/workflows/ide-macos.yml'
+  pull_request:
+    paths:
+      - 'ide/macos/**'
+      - '.github/workflows/ide-macos.yml'
+
+jobs:
+  build-and-test:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run IDECore tests
+        run: swift test --package-path ide/macos
+        env:
+          CK_REPO_ROOT: ${{ github.workspace }}
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen --spec ide/macos/project.yml --project ide/macos
+      - name: Build the app
+        run: >
+          xcodebuild -project ide/macos/ClearKryptIDE.xcodeproj
+          -scheme ClearKryptIDE -configuration Release
+          -derivedDataPath ide/macos/build
+          CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+          build
+      - name: Zip the app
+        run: |
+          cd ide/macos/build/Build/Products/Release
+          ditto -c -k --keepParent ClearKryptIDE.app clearkrypt-ide-macos.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: clearkrypt-ide-macos
+          path: ide/macos/build/Build/Products/Release/clearkrypt-ide-macos.zip
