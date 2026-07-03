@@ -39,9 +39,25 @@ export type { ParseResult } from './parse/parser';
 // Debug printing (tokens and AST outline views).
 export { printTokens, printAst } from './syntax/debugPrint';
 
-// IR.
+// Semantic checking.
+export { checkProject, checkParsedProject } from './sem/checker';
+export type { CheckedProject, CallResolution } from './sem/checker';
+export type { SemType } from './sem/types';
+export { typeToString, typesAssignable, primitiveType } from './sem/types';
+export type {
+  DeclarationSymbol,
+  ModuleSymbol,
+  SemanticModel,
+  SymbolInfo,
+  SymbolKind,
+} from './sem/symbols';
+
+// IR and lowering.
 export * from './ir/nodes';
 export * as irSamples from './ir/testFixtures';
+export { lowerProject } from './lower/lower';
+export type { LowerResult, LowerOptions } from './lower/lower';
+export { printIr } from './lower/debugPrint';
 
 // Emitter contract.
 export * from './emit/contract';

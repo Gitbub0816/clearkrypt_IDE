@@ -23,6 +23,7 @@ export const DiagnosticCodes = {
   UnknownImport: 'CK0010',
   InvalidArgumentName: 'CK0011',
   DuplicateModule: 'CK0012',
+  MissingModule: 'CK0013',
 
   // Syntax codes (CK1xxx).
   UnexpectedToken: 'CK1001',
@@ -50,6 +51,7 @@ export const diagnosticCodeSummaries: Readonly<Record<DiagnosticCode, string>> =
   CK0010: 'Unknown import',
   CK0011: 'Invalid argument name',
   CK0012: 'Duplicate module declaration',
+  CK0013: 'Missing module declaration',
   CK1001: 'Unexpected token',
   CK1002: 'Unterminated string literal',
   CK1003: 'Invalid character',

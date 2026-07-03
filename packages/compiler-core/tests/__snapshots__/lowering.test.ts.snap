@@ -1,0 +1,55 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`lowerProject - IR snapshots > lowers async throws functions and error declarations 1`] = `
+"Module app.net (syntax/async-throws.ck)
+  Error NetworkError
+    Case timeout
+    Case server(message: String)
+  Model RemoteUser
+    Field id: ID
+    Field name: String
+  Function fetchUser(id: ID) async throws NetworkError -> RemoteUser
+    Return construct app.net.RemoteUser(id: param(id) : ID, name: "Remote" : String) : RemoteUser
+"
+`;
+
+exports[`lowerProject - IR snapshots > lowers functions with expressions and control flow 1`] = `
+"Module app.text (syntax/simple-function.ck)
+  Function fullName(first: String, last: String) -> String
+    Return ((param(first) : String + " " : String) : String + param(last) : String) : String
+  Function larger(a: Int, b: Int) -> Int
+    If (param(a) : Int > param(b) : Int) : Bool
+      Return param(a) : Int
+    Else
+      Return param(b) : Int
+  Function describeCount(count: Int) -> String
+    Let label: String = "items" : String
+    If (param(count) : Int == 1 : Int) : Bool
+      Return "1 item" : String
+    Return ("many " : String + local(label) : String) : String
+"
+`;
+
+exports[`lowerProject - IR snapshots > lowers hello-world 1`] = `
+"Module app.main (projects/hello-world/src/main.ck)
+  Model Greeting
+    Field id: ID
+    Field message: String
+    Field isFriendly: Bool = true : Bool
+  Function greetingText(greeting: Greeting) -> String
+    Return param(greeting) : Greeting.message : String
+  Function friendlyGreeting(message: String) -> Greeting
+    Return construct app.main.Greeting(id: "greeting-1" : String, message: param(message) : String) : Greeting
+"
+`;
+
+exports[`lowerProject - IR snapshots > lowers the two-modules project with cross-module references 1`] = `
+"Module app.models (projects/two-modules/src/models.ck)
+  Model User
+    Field id: ID
+    Field name: String
+Module app.api (projects/two-modules/src/api.ck)
+  Function welcome(user: User) -> String
+    Return ("Welcome, " : String + param(user) : User.name : String) : String
+"
+`;
