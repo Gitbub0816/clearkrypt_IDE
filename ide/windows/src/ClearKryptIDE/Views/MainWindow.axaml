@@ -28,6 +28,8 @@
           <CheckBox Content="React" IsChecked="{Binding TargetReact}" />
         </StackPanel>
         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+          <Button Content="Worktrees…" Command="{Binding ToggleWorktreesPanelCommand}"
+                  IsVisible="{Binding Worktrees, Converter={x:Static ObjectConverters.IsNotNull}}" />
           <Button Content="Save" Command="{Binding SaveCommand}" ToolTip.Tip="Ctrl+S" />
           <Button Content="Settings…" Click="OnSettingsClicked" />
         </StackPanel>
@@ -121,6 +123,44 @@
         <TextBox Text="{Binding BuildOutput, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True"
                  FontFamily="Cascadia Code,Consolas,Menlo,monospace" FontSize="12"
                  BorderThickness="0" />
+      </TabItem>
+      <TabItem Header="Worktrees"
+               IsVisible="{Binding Worktrees, Converter={x:Static ObjectConverters.IsNotNull}}"
+               IsSelected="{Binding IsWorktreesPanelOpen}">
+        <Grid RowDefinitions="Auto,Auto,*" DataContext="{Binding Worktrees}" Margin="8">
+          <TextBlock Grid.Row="0" Text="{Binding ErrorMessage}" Foreground="IndianRed"
+                     IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}"
+                     Margin="0,0,0,6" />
+          <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="6" Margin="0,0,0,6">
+            <TextBox Watermark="new-branch-name" Width="220" Text="{Binding NewBranchName}" />
+            <Button Content="New worktree" Command="{Binding AddCommand}" />
+            <Button Content="Refresh" Command="{Binding RefreshCommand}" />
+          </StackPanel>
+          <ListBox Grid.Row="2" ItemsSource="{Binding Worktrees}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:WorktreeItemViewModel">
+                <Grid ColumnDefinitions="*,140,Auto,Auto" Margin="0,2">
+                  <TextBlock Grid.Column="0" Text="{Binding Path}" TextTrimming="CharacterEllipsis"
+                             ToolTip.Tip="{Binding Path}" />
+                  <TextBlock Grid.Column="1" Text="{Binding BranchLabel}" Opacity="0.8" />
+                  <TextBlock Grid.Column="2" Text="current" FontSize="10" Opacity="0.6"
+                             VerticalAlignment="Center" Margin="0,0,8,0"
+                             IsVisible="{Binding IsCurrent}" />
+                  <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4">
+                    <Button Content="Open" FontSize="11" Padding="6,1"
+                            IsVisible="{Binding !IsCurrent}"
+                            Command="{Binding $parent[ListBox].((vm:WorktreesViewModel)DataContext).OpenCommand}"
+                            CommandParameter="{Binding}" />
+                    <Button Content="Remove" FontSize="11" Padding="6,1"
+                            IsVisible="{Binding !IsCurrent}"
+                            Command="{Binding $parent[ListBox].((vm:WorktreesViewModel)DataContext).RemoveCommand}"
+                            CommandParameter="{Binding}" />
+                  </StackPanel>
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Grid>
       </TabItem>
     </TabControl>
 

@@ -86,8 +86,10 @@ clearkrypt new hello && cd hello && clearkrypt build
   Swift (SwiftUI) IDE for macOS — grouped project navigator, editors with
   grammar + semantic-token highlighting, live diagnostics with navigation,
   document outline, check/build with target selection, read-only generated
-  output, and language-server lifecycle management. CI publishes the
-  Windows win-x64 build and the macOS app zip as download artifacts.
+  output, git worktree list/add/remove/open (a thin, tested wrapper over
+  the real `git worktree`, not a parallel implementation of it), and
+  language-server lifecycle management. CI publishes the Windows win-x64
+  build and the macOS app zip as download artifacts.
 
 Screens, components, routes, capabilities, and native interop blocks parse
 and type-check today; their target lowering ships in later milestones and

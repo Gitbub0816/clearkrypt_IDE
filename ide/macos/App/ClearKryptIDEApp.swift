@@ -32,7 +32,9 @@ final class AppModel: ObservableObject {
             let project = try ClearKryptProject.load(folder: path)
             settings.addRecentProject(path)
             openError = nil
-            let session = ProjectSession(project: project, settings: settings)
+            let session = ProjectSession(
+                project: project, settings: settings,
+                onOpenWorktree: { [weak self] worktreePath in self?.openProject(at: worktreePath) })
             self.session = session
             session.start()
         } catch {

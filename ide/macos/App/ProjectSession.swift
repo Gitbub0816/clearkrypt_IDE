@@ -69,17 +69,27 @@ final class ProjectSession: ObservableObject {
     @Published var targetKotlin: Bool
     @Published var targetReact: Bool
     @Published var completionLabels: [String] = []
+    /// Nil when the project is not inside a git repository at all — a
+    /// worktree-less project has nothing to list or switch between.
+    @Published var worktrees: WorktreesModel?
 
     private let settings: SettingsStore
     private var client: LSPClient?
     private var changeDebounce: [String: DispatchWorkItem] = [:]
 
-    init(project: ClearKryptProject, settings: SettingsStore) {
+    init(project: ClearKryptProject, settings: SettingsStore, onOpenWorktree: ((String) -> Void)? = nil) {
         self.project = project
         self.settings = settings
         self.targetSwift = project.manifest.targets.swift
         self.targetKotlin = project.manifest.targets.kotlin
         self.targetReact = project.manifest.targets.react
+
+        if let onOpenWorktree, GitWorktreeService.isGitRepository(project.rootPath) {
+            self.worktrees = WorktreesModel(
+                repositoryPath: project.rootPath,
+                currentWorktreePath: project.rootPath,
+                onOpenWorktree: onOpenWorktree)
+        }
     }
 
     var selectedDocument: OpenDocument? {

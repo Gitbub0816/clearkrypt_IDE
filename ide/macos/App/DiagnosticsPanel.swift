@@ -82,6 +82,53 @@ struct BuildPanel: View {
     }
 }
 
+struct WorktreesPanel: View {
+    @ObservedObject var worktrees: WorktreesModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let error = worktrees.errorMessage {
+                Text(error)
+                    .foregroundStyle(.red)
+                    .font(.caption)
+            }
+            HStack {
+                TextField("new-branch-name", text: $worktrees.newBranchName)
+                    .frame(width: 220)
+                    .onSubmit { worktrees.add() }
+                Button("New worktree") { worktrees.add() }
+                    .disabled(worktrees.isBusy || worktrees.newBranchName.trimmingCharacters(in: .whitespaces).isEmpty)
+                Button("Refresh") { worktrees.refresh() }
+                    .disabled(worktrees.isBusy)
+                Spacer()
+            }
+            List(worktrees.worktrees) { worktree in
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(worktree.path)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Text(worktree.shortBranch ?? "detached")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if worktrees.isCurrent(worktree) {
+                        Text("current")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Button("Open") { worktrees.open(worktree) }
+                        Button("Remove") { worktrees.remove(worktree) }
+                            .disabled(worktree.isLocked)
+                    }
+                }
+            }
+        }
+        .padding(8)
+    }
+}
+
 struct SettingsView: View {
     let settings: IDECoreSettingsProxy
     @State private var sdkPath: String = ""

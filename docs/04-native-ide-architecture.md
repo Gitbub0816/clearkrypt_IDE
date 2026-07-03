@@ -146,6 +146,17 @@ Project settings that affect builds live in `clearkrypt.toml` (versioned).
 User preferences (theme, SDK path, font) are local per IDE and not
 committed (Constitution Document 7 §20).
 
+## Worktrees
+
+Both IDEs can list, create, and remove git worktrees of the open project's
+repository, and open any of them: a Windows/Avalonia project window per
+worktree, or (macOS) switching the current session's project root. This is
+a thin wrapper over the real `git worktree` subcommand — no parallel
+implementation of git's own logic — so a worktree the IDE creates is
+identical to one created from a terminal, and vice versa. Each worktree
+keeps fully independent editor and diagnostics state; nothing is shared
+between them except the underlying repository.
+
 ## Native IDE MVP
 
 MVP acceptance (identical for both platforms):
@@ -168,4 +179,6 @@ MVP acceptance (identical for both platforms):
 - Test runner.
 - Generated-code diff viewer.
 - Compiler performance profiler.
-- Agent worktree board.
+- A board view across worktrees for reviewing several agents' work at
+  once (basic worktree list/add/remove/open shipped; the board itself has
+  not).

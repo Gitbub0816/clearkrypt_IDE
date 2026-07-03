@@ -126,6 +126,10 @@ struct ContentView: View {
                 .tabItem { Text("Diagnostics") }
             BuildPanel(session: session)
                 .tabItem { Text("Build") }
+            if let worktrees = session.worktrees {
+                WorktreesPanel(worktrees: worktrees)
+                    .tabItem { Text("Worktrees") }
+            }
         }
         .padding(.horizontal, 4)
     }

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using Avalonia.Threading;
 using ClearKryptIDE.Core.Cli;
+using ClearKryptIDE.Core.Git;
 using ClearKryptIDE.Core.Lsp;
 using ClearKryptIDE.Core.Lsp.Protocol;
 using ClearKryptIDE.Core.Project;
@@ -29,6 +30,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private bool _targetSwift;
     private bool _targetKotlin;
     private bool _targetReact;
+    private bool _isWorktreesPanelOpen;
 
     public MainWindowViewModel(ClearKryptProject project, SettingsStore settingsStore)
     {
@@ -50,6 +52,14 @@ public sealed class MainWindowViewModel : ViewModelBase
         BuildCommand = new AsyncRelayCommand(() => RunCliAsync(build: true), () => !IsBuildRunning);
         RestartServerCommand = new AsyncRelayCommand(RestartServerAsync);
         SaveCommand = new AsyncRelayCommand(SaveSelectedDocumentAsync);
+        ToggleWorktreesPanelCommand = new RelayCommand(
+            () => IsWorktreesPanelOpen = !IsWorktreesPanelOpen, () => Worktrees is not null);
+
+        if (GitWorktreeService.IsGitRepository(project.RootPath))
+        {
+            Worktrees = new WorktreesViewModel(project.RootPath, project.RootPath);
+            Worktrees.OpenRequested += path => WorktreeOpenRequested?.Invoke(path);
+        }
     }
 
     public ClearKryptProject Project { get; }
@@ -76,11 +86,29 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public AsyncRelayCommand SaveCommand { get; }
 
+    public RelayCommand ToggleWorktreesPanelCommand { get; }
+
+    /// <summary>
+    /// Null when the project is not inside a git repository at all; a
+    /// worktree-less ClearKrypt project has nothing to list or switch
+    /// between.
+    /// </summary>
+    public WorktreesViewModel? Worktrees { get; }
+
+    public bool IsWorktreesPanelOpen
+    {
+        get => _isWorktreesPanelOpen;
+        set => SetField(ref _isWorktreesPanelOpen, value);
+    }
+
     /// <summary>Raised when diagnostics change for a uri so open editors can redraw underlines.</summary>
     public event Action<string>? DocumentDiagnosticsChanged;
 
     /// <summary>Raised when a diagnostics row is activated so the window can focus the span.</summary>
     public event Action<DiagnosticItemViewModel>? NavigationRequested;
+
+    /// <summary>Raised with a worktree path the user asked to open in its own window.</summary>
+    public event Action<string>? WorktreeOpenRequested;
 
     public EditorDocumentViewModel? SelectedDocument
     {

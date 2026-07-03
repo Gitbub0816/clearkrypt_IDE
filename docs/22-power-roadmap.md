@@ -22,6 +22,7 @@ Shipped and snapshot-tested across Swift, Kotlin, and TypeScript:
 - an AI-consumption-tuned language skill (`skills/clearkrypt-language/`,
   indexed by `llms.txt`) and a standalone-publishable, dependency-free
   npm CLI (`clearkrypt`)
+- git worktree list/add/remove/open in both native IDEs
 
 ## The thesis
 
