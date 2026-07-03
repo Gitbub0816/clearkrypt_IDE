@@ -18,7 +18,7 @@ final class OpenDocument: ObservableObject, Identifiable {
         self.text = text
     }
 
-    var id: String { uri }
+    nonisolated var id: String { uri }
     var isClearKryptSource: Bool { file.relativePath.hasSuffix(".ck") }
     var tabTitle: String { isDirty ? file.name + " •" : file.name }
 }
