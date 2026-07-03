@@ -101,7 +101,16 @@ final class LSPClientTests: XCTestCase {
         let deadline = Date().addingTimeInterval(5)
         while Date() < deadline {
             let bodies = transport.sentBodies
-            if bodies.contains(where: { $0.contains(text) || (alternative.map { alt in $0.contains(alt) } ?? false) }) {
+            let matches = bodies.contains { body in
+                if body.contains(text) {
+                    return true
+                }
+                if let alternative, body.contains(alternative) {
+                    return true
+                }
+                return false
+            }
+            if matches {
                 return
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.02))
