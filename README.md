@@ -101,6 +101,10 @@ The `/docs` folder supports the constitution. If `/docs` conflicts with
 - `constitution/` — the eight constitutional documents. Read these first.
 - `docs/` — vision, language spec, compiler architecture, target mappings,
   roadmap, IDE architecture, language-server contract, development guide.
+- `skills/clearkrypt-language/SKILL.md` — a complete, AI-consumption-tuned
+  language reference (any AI system, not just one vendor's, can point at
+  this to learn to write correct, idiomatic ClearKrypt). `llms.txt` at the
+  repo root indexes it alongside the rest of the docs.
 - `packages/` — the TypeScript toolchain monorepo (compiler, emitters,
   formatter, language service, CLI).
 - `ide/windows` — the C#/Avalonia Windows IDE. `ide/macos` — the

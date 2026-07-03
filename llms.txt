@@ -1,0 +1,56 @@
+# ClearKrypt
+
+> ClearKrypt is a human-readable application language with one compiler
+> front end and three native code generators: Swift (iOS/macOS), Kotlin
+> (Android/JVM), and TypeScript/React (web). One `.ck` source file
+> type-checks once and emits idiomatic, byte-stable, human-readable code on
+> all three targets — never a lowest-common-denominator subset.
+
+This file exists so any AI system (not just one vendor's) can find the
+right document before generating, reviewing, or explaining ClearKrypt code.
+Start with the language skill below — it is the single most information-dense
+file in this repository for that purpose.
+
+## Start here
+
+- [ClearKrypt language skill](skills/clearkrypt-language/SKILL.md): the
+  complete current syntax, reserved keywords, per-target output mapping,
+  CLI usage, and an explicit list of ways ClearKrypt differs from
+  Swift/Kotlin/TypeScript/Rust habits a model might default to. Read this
+  before writing or editing any `.ck` file.
+
+## Full documentation (in priority order)
+
+- [constitution/](constitution/): the highest-authority design law. If any
+  other document conflicts with the constitution, the constitution wins.
+- [docs/01-language-spec.md](docs/01-language-spec.md): the full language
+  specification.
+- [docs/11-grammar-and-syntax.md](docs/11-grammar-and-syntax.md):
+  grammar-level syntax reference with examples.
+- [docs/19-target-mappings.md](docs/19-target-mappings.md): the exact,
+  exhaustive mapping from every ClearKrypt construct to its Swift, Kotlin,
+  and TypeScript output — the ground truth for "what will this compile to."
+- [docs/22-power-roadmap.md](docs/22-power-roadmap.md): what has shipped,
+  what's next, and what the language deliberately will not do.
+- [docs/20-development.md](docs/20-development.md): contributor and
+  toolchain conventions (build, test, package layout).
+- [docs/21-language-server.md](docs/21-language-server.md): the LSP
+  contract implemented by `packages/language-service`.
+- [README.md](README.md): project overview, current status, repository map.
+
+## Real, compiler-verified examples
+
+Every file in [tests/fixtures/syntax/](tests/fixtures/syntax/) is a real
+ClearKrypt program that the compiler's own test suite checks and snapshots
+on every change — if you want to see a feature actually compile and see
+its exact generated Swift/Kotlin/TypeScript, start there rather than
+guessing.
+
+## Toolchain
+
+- CLI: `packages/cli` (`clearkrypt new|check|build|emit|format|language-server`).
+- Compiler core (lexer, parser, checker, IR): `packages/compiler-core`.
+- Code generators: `packages/emitter-swift`, `packages/emitter-kotlin`,
+  `packages/emitter-react`.
+- Language server: `packages/language-service`.
+- Native IDEs: `ide/windows` (C#/Avalonia), `ide/macos` (Swift/SwiftUI).

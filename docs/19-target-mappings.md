@@ -180,6 +180,15 @@ Match exhaustiveness is proven by the checker (CK0014), so the generated
 switches never rely on target-side exhaustiveness analysis — but they keep
 it where the target offers it (Kotlin `when` over sealed types).
 
+## Native block target names vs. build target names
+
+`native <target> fn` uses three keywords: `swift`, `kotlin`, `typescript`.
+The `--target`/`clearkrypt.toml` build target names are `swift`, `kotlin`,
+`react`. The web build target is `react`, but its native-interop keyword is
+`typescript` (`native typescript fn ...`) — one target, two names. The
+checker's `CK0005` coverage check maps `react` to `typescript` internally
+when deciding whether a native group covers every selected target.
+
 ## Not yet emitted (honest limitations)
 
 Per the target honesty law, the following parse and type-check but are
