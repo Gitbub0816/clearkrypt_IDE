@@ -1,0 +1,143 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ClearKryptIDE.ViewModels"
+        xmlns:views="using:ClearKryptIDE.Views"
+        x:Class="ClearKryptIDE.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="{Binding WindowTitle}"
+        Width="1280" Height="820"
+        WindowStartupLocation="CenterScreen">
+
+  <Window.KeyBindings>
+    <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveCommand}" />
+  </Window.KeyBindings>
+
+  <Grid RowDefinitions="Auto,*,4,240,Auto">
+
+    <!-- Toolbar -->
+    <Border Grid.Row="0" Padding="8,6" BorderThickness="0,0,0,1"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+      <DockPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Content="Check" Command="{Binding CheckCommand}" />
+          <Button Content="Build" Classes="accent" Command="{Binding BuildCommand}" />
+          <Separator Width="12" Background="Transparent" />
+          <TextBlock Text="Targets:" VerticalAlignment="Center" Opacity="0.7" />
+          <CheckBox Content="Swift" IsChecked="{Binding TargetSwift}" />
+          <CheckBox Content="Kotlin" IsChecked="{Binding TargetKotlin}" />
+          <CheckBox Content="React" IsChecked="{Binding TargetReact}" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+          <Button Content="Save" Command="{Binding SaveCommand}" ToolTip.Tip="Ctrl+S" />
+          <Button Content="Settings…" Click="OnSettingsClicked" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- Main area: navigator | editors | outline -->
+    <Grid Grid.Row="1" ColumnDefinitions="260,4,*,4,220">
+
+      <Grid Grid.Column="0" RowDefinitions="Auto,*">
+        <TextBlock Grid.Row="0" Text="Project" Margin="10,8" FontWeight="SemiBold" />
+        <TreeView Grid.Row="1" Name="ProjectTree" ItemsSource="{Binding Root}"
+                  DoubleTapped="OnProjectTreeDoubleTapped">
+          <TreeView.ItemTemplate>
+            <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="vm:ProjectNodeViewModel">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Text="{Binding Name}" />
+                <Border IsVisible="{Binding Badge, Converter={x:Static ObjectConverters.IsNotNull}}"
+                        Background="#33808080" CornerRadius="3" Padding="4,0">
+                  <TextBlock Text="{Binding Badge}" FontSize="10" Opacity="0.8" />
+                </Border>
+              </StackPanel>
+            </TreeDataTemplate>
+          </TreeView.ItemTemplate>
+        </TreeView>
+      </Grid>
+
+      <GridSplitter Grid.Column="1" Background="Transparent" ResizeDirection="Columns" />
+
+      <TabControl Grid.Column="2" ItemsSource="{Binding Documents}"
+                  SelectedItem="{Binding SelectedDocument}">
+        <TabControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:EditorDocumentViewModel">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="{Binding TabHeader}" VerticalAlignment="Center" />
+              <Button Content="✕" FontSize="10" Padding="4,0" Background="Transparent"
+                      BorderThickness="0" Click="OnCloseTabClicked" />
+            </StackPanel>
+          </DataTemplate>
+        </TabControl.ItemTemplate>
+        <TabControl.ContentTemplate>
+          <DataTemplate x:DataType="vm:EditorDocumentViewModel">
+            <views:EditorHost />
+          </DataTemplate>
+        </TabControl.ContentTemplate>
+      </TabControl>
+
+      <GridSplitter Grid.Column="3" Background="Transparent" ResizeDirection="Columns" />
+
+      <Grid Grid.Column="4" RowDefinitions="Auto,*">
+        <TextBlock Grid.Row="0" Text="Outline" Margin="10,8" FontWeight="SemiBold" />
+        <TreeView Grid.Row="1" Name="OutlineTree" ItemsSource="{Binding Outline}"
+                  DoubleTapped="OnOutlineDoubleTapped">
+          <TreeView.ItemTemplate>
+            <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="vm:SymbolNodeViewModel">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Text="{Binding Name}" />
+                <TextBlock Text="{Binding KindLabel}" FontSize="10" Opacity="0.6"
+                           VerticalAlignment="Center" />
+              </StackPanel>
+            </TreeDataTemplate>
+          </TreeView.ItemTemplate>
+        </TreeView>
+      </Grid>
+    </Grid>
+
+    <GridSplitter Grid.Row="2" Background="Transparent" ResizeDirection="Rows" />
+
+    <!-- Bottom panel -->
+    <TabControl Grid.Row="3">
+      <TabItem Header="Diagnostics">
+        <ListBox Name="DiagnosticsList" ItemsSource="{Binding Diagnostics}"
+                 DoubleTapped="OnDiagnosticDoubleTapped">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:DiagnosticItemViewModel">
+              <Grid ColumnDefinitions="24,80,*,180,60,60">
+                <TextBlock Grid.Column="0" Text="{Binding SeverityIcon}" />
+                <TextBlock Grid.Column="1" Text="{Binding Code}" FontFamily="Consolas,monospace" />
+                <TextBlock Grid.Column="2" Text="{Binding Message}" TextTrimming="CharacterEllipsis"
+                           ToolTip.Tip="{Binding Message}" />
+                <TextBlock Grid.Column="3" Text="{Binding FileDisplayPath}" Opacity="0.7"
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="4" Text="{Binding DisplayLine}" Opacity="0.7" />
+                <TextBlock Grid.Column="5" Text="{Binding Target}" Opacity="0.7" />
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </TabItem>
+      <TabItem Header="Build">
+        <TextBox Text="{Binding BuildOutput, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True"
+                 FontFamily="Cascadia Code,Consolas,Menlo,monospace" FontSize="12"
+                 BorderThickness="0" />
+      </TabItem>
+    </TabControl>
+
+    <!-- Status bar -->
+    <Border Grid.Row="4" Padding="10,4" BorderThickness="0,1,0,0"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+      <DockPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="Language server:" Opacity="0.7" />
+          <TextBlock Text="{Binding ServerStatus}" />
+          <Button Content="Restart" FontSize="11" Padding="6,1"
+                  IsVisible="{Binding ServerCrashed}"
+                  Command="{Binding RestartServerCommand}" />
+        </StackPanel>
+        <TextBlock Text="{Binding Project.RootPath}" Opacity="0.5"
+                   HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" />
+      </DockPanel>
+    </Border>
+  </Grid>
+</Window>

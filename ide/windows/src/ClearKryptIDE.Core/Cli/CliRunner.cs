@@ -20,6 +20,14 @@ public sealed class CliRunner
         _clearkryptCommand = clearkryptCommand;
     }
 
+    /// <summary>
+    /// Raised for each line of stdout/stderr as the process produces it, so an
+    /// IDE build panel can stream progress instead of waiting for exit. Purely
+    /// additive: the final <see cref="CliInvocationResult"/> is unaffected and
+    /// still carries the complete buffered text.
+    /// </summary>
+    public event Action<CliOutputLine>? OutputLineReceived;
+
     public Task<CliInvocationResult> CheckAsync(
         string projectDirectory,
         IEnumerable<string>? targets = null,
@@ -58,8 +66,8 @@ public sealed class CliRunner
         using var process = new Process { StartInfo = startInfo };
         process.Start();
 
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        var stdoutTask = PumpAsync(process.StandardOutput, CliOutputStream.StandardOutput, cancellationToken);
+        var stderrTask = PumpAsync(process.StandardError, CliOutputStream.StandardError, cancellationToken);
         await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
 
         var stdout = await stdoutTask.ConfigureAwait(false);
@@ -67,6 +75,27 @@ public sealed class CliRunner
 
         var result = TryParse(stdout);
         return new CliInvocationResult(process.ExitCode, result, stdout, stderr);
+    }
+
+    /// <summary>Reads a process stream line-by-line, raising <see cref="OutputLineReceived"/> per line while also buffering the full text.</summary>
+    private async Task<string> PumpAsync(StreamReader reader, CliOutputStream stream, CancellationToken cancellationToken)
+    {
+        var buffer = new System.Text.StringBuilder();
+        string? line;
+        var isFirstLine = true;
+        while ((line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false)) is not null)
+        {
+            if (!isFirstLine)
+            {
+                buffer.Append('\n');
+            }
+
+            isFirstLine = false;
+            buffer.Append(line);
+            OutputLineReceived?.Invoke(new CliOutputLine(stream, line));
+        }
+
+        return buffer.ToString();
     }
 
     private static CliResult? TryParse(string stdout)

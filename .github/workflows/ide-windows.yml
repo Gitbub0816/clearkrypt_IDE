@@ -1,0 +1,45 @@
+name: Windows IDE
+
+on:
+  push:
+    paths:
+      - 'ide/windows/**'
+      - 'editors/**'
+      - '.github/workflows/ide-windows.yml'
+  pull_request:
+    paths:
+      - 'ide/windows/**'
+      - 'editors/**'
+      - '.github/workflows/ide-windows.yml'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # The end-to-end test drives the real ClearKrypt language server,
+      # so build the toolchain first.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet build ide/windows/ClearKryptIDE.sln -warnaserror
+      - run: dotnet test ide/windows/ClearKryptIDE.sln --no-build
+
+  publish-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet publish ide/windows/src/ClearKryptIDE -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
+      - uses: actions/upload-artifact@v4
+        with:
+          name: clearkrypt-ide-windows
+          path: publish/

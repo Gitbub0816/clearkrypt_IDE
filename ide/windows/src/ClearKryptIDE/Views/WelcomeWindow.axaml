@@ -1,0 +1,37 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ClearKryptIDE.ViewModels"
+        x:Class="ClearKryptIDE.Views.WelcomeWindow"
+        x:DataType="vm:WelcomeWindowViewModel"
+        Title="ClearKrypt IDE"
+        Width="560" Height="420"
+        WindowStartupLocation="CenterScreen"
+        CanResize="false">
+  <Grid Margin="24" RowDefinitions="Auto,Auto,*,Auto,Auto">
+    <TextBlock Grid.Row="0" Text="ClearKrypt IDE" FontSize="28" FontWeight="Bold" />
+    <TextBlock Grid.Row="1" Text="Open a folder that contains a clearkrypt.toml project." Margin="0,4,0,16" Opacity="0.7" />
+
+    <Border Grid.Row="2" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1" CornerRadius="4">
+      <Grid RowDefinitions="Auto,*">
+        <TextBlock Grid.Row="0" Text="Recent projects" Margin="12,8" FontWeight="SemiBold" />
+        <ListBox Grid.Row="1" Name="RecentProjectsList" ItemsSource="{Binding RecentProjects}" Margin="4"
+                 DoubleTapped="OnRecentProjectDoubleTapped">
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <TextBlock Text="{Binding}" ToolTip.Tip="{Binding}" TextTrimming="CharacterEllipsis" />
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Grid>
+    </Border>
+
+    <TextBlock Grid.Row="3" Text="{Binding ErrorMessage}"
+               Foreground="IndianRed" TextWrapping="Wrap" Margin="0,12,0,0"
+               IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0" Spacing="8">
+      <Button Content="Open Selected Recent" Click="OnOpenRecentClicked" />
+      <Button Content="Open Project Folder…" Classes="accent" Command="{Binding BrowseCommand}" />
+    </StackPanel>
+  </Grid>
+</Window>

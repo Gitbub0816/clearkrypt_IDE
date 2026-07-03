@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>ClearKryptIDE</RootNamespace>
+    <AssemblyName>ClearKryptIDE</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <!-- Reflection-based bindings keep the XAML forgiving for an MVP shell; can move to compiled bindings later. -->
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.18" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.18" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.18" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.18" />
+    <PackageReference Include="Avalonia.AvaloniaEdit" Version="11.4.1" />
+    <PackageReference Include="AvaloniaEdit.TextMate" Version="11.4.1" />
+    <PackageReference Include="TextMateSharp" Version="2.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ClearKryptIDE.Core\ClearKryptIDE.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The shared grammar lives in /editors so every IDE shell embeds the same file (docs/04-native-ide-architecture.md). -->
+    <EmbeddedResource Include="..\..\..\..\editors\clearkrypt.tmLanguage.json" LogicalName="ClearKryptIDE.Resources.clearkrypt.tmLanguage.json" Link="Resources\clearkrypt.tmLanguage.json" />
+    <EmbeddedResource Include="Resources\clearkrypt-dark-theme.json" LogicalName="ClearKryptIDE.Resources.clearkrypt-dark-theme.json" />
+    <EmbeddedResource Include="Resources\clearkrypt-light-theme.json" LogicalName="ClearKryptIDE.Resources.clearkrypt-light-theme.json" />
+  </ItemGroup>
+
+</Project>
