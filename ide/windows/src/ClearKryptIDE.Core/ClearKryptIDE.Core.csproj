@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>ClearKryptIDE.Core</RootNamespace>
+    <AssemblyName>ClearKryptIDE.Core</AssemblyName>
+    <!-- UI-free class library: no Avalonia references belong here. -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>

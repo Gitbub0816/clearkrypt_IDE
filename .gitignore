@@ -3,3 +3,6 @@ dist/
 *.tsbuildinfo
 .vitest-cache/
 coverage/
+obj/
+bin/
+!packages/cli/bin/
