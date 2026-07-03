@@ -43,8 +43,11 @@ clearkrypt new hello && cd hello && clearkrypt build
 - **SDK packaging** (`scripts/package-sdk.mjs`): one relocatable directory
   with `clearkrypt` launchers for macOS/Linux/Windows (requires Node 20+).
 - **Native IDEs** (`/ide`): a C# (.NET 8, Avalonia) IDE for Windows and a
-  Swift (SwiftUI) IDE for macOS, both thin clients over the language server
-  and CLI — in active development.
+  Swift (SwiftUI) IDE for macOS — grouped project navigator, editors with
+  grammar + semantic-token highlighting, live diagnostics with navigation,
+  document outline, check/build with target selection, read-only generated
+  output, and language-server lifecycle management. CI publishes the
+  Windows win-x64 build and the macOS app zip as download artifacts.
 
 Screens, components, routes, capabilities, and native interop blocks parse
 and type-check today; their target lowering ships in later milestones and

@@ -13,7 +13,7 @@
 | 6 CLI MVP | Done |
 | 7 UI declarations | Not started (parse/check done; lowering pending) |
 | 8 Language server | Done (diagnostics, symbols, hover, completion, semantic tokens, formatting) |
-| 9 Native IDE shells | In progress (`ide/windows` C#/Avalonia, `ide/macos` Swift/SwiftUI) |
+| 9 Native IDE shells | MVP done: `ide/windows` (C#/Avalonia, built+tested in CI, win-x64 download) and `ide/macos` (Swift/SwiftUI, macOS CI is the compile gate, app zip artifact) |
 | 10 Interop MVP | Partially done (parse/check/CK0005 done; build inclusion pending) |
 | 11 Packaging and examples | Partially done (SDK packaging + release CI done; more examples pending) |
 | 12 IDE quality pass | Not started |
