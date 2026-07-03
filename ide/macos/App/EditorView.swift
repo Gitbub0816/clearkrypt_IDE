@@ -89,7 +89,7 @@ struct EditorView: NSViewRepresentable {
             _ textView: NSTextView,
             completions words: [String],
             forPartialWordRange charRange: NSRange,
-            indexOfSelectedItem index: UnsafeMutablePointer<Int>
+            indexOfSelectedItem index: UnsafeMutablePointer<Int>?
         ) -> [String] {
             let prefix = (textView.string as NSString).substring(with: charRange)
             let fromServer = session.completionLabels.filter { $0.hasPrefix(prefix) }
