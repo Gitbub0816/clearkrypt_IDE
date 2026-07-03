@@ -24,6 +24,10 @@ export const DiagnosticCodes = {
   InvalidArgumentName: 'CK0011',
   DuplicateModule: 'CK0012',
   MissingModule: 'CK0013',
+  NonExhaustiveMatch: 'CK0014',
+  InvalidMatch: 'CK0015',
+  InvalidThrow: 'CK0016',
+  InvalidTry: 'CK0017',
 
   // Syntax codes (CK1xxx).
   UnexpectedToken: 'CK1001',
@@ -52,6 +56,10 @@ export const diagnosticCodeSummaries: Readonly<Record<DiagnosticCode, string>> =
   CK0011: 'Invalid argument name',
   CK0012: 'Duplicate module declaration',
   CK0013: 'Missing module declaration',
+  CK0014: 'Non-exhaustive match',
+  CK0015: 'Invalid match',
+  CK0016: 'Invalid throw',
+  CK0017: 'Missing or invalid try',
   CK1001: 'Unexpected token',
   CK1002: 'Unterminated string literal',
   CK1003: 'Invalid character',

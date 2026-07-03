@@ -32,6 +32,8 @@ const TWO_CHAR_OPERATORS: Readonly<Record<string, TokenKind>> = {
   '!=': 'BangEquals',
   '&&': 'AmpAmp',
   '||': 'PipePipe',
+  '?.': 'QuestionDot',
+  '??': 'QuestionQuestion',
 };
 
 const ONE_CHAR_OPERATORS: Readonly<Record<string, TokenKind>> = {
@@ -75,17 +77,40 @@ function isDigit(code: number): boolean {
  * decoded prefix so parsing, and the IDE, can carry on).
  */
 export function decodeStringLiteral(raw: string): string {
-  let i = raw.startsWith('"') ? 1 : 0;
-  const end = raw.length;
-  const closingQuoteIndex = raw.endsWith('"') && end > i ? end - 1 : -1;
+  let body = raw;
+  if (body.startsWith('"')) {
+    body = body.slice(1);
+  }
+  if (body.endsWith('"')) {
+    body = body.slice(0, -1);
+  }
+  return decodeEscapes(body);
+}
+
+/**
+ * Decodes one segment of an interpolated string. Raw segment shapes:
+ * head `"text\(`, middle `)text\(`, tail `)text"`.
+ */
+export function decodeInterpolationSegment(raw: string): string {
+  let body = raw;
+  if (body.startsWith('"') || body.startsWith(')')) {
+    body = body.slice(1);
+  }
+  if (body.endsWith('\\(')) {
+    body = body.slice(0, -2);
+  } else if (body.endsWith('"')) {
+    body = body.slice(0, -1);
+  }
+  return decodeEscapes(body);
+}
+
+function decodeEscapes(body: string): string {
   let value = '';
-  while (i < end) {
-    if (i === closingQuoteIndex) {
-      break;
-    }
-    const ch = raw[i];
-    if (ch === '\\' && i + 1 < end) {
-      const next = raw[i + 1];
+  let i = 0;
+  while (i < body.length) {
+    const ch = body[i];
+    if (ch === '\\' && i + 1 < body.length) {
+      const next = body[i + 1];
       switch (next) {
         case '"':
           value += '"';
@@ -132,6 +157,57 @@ export function lex(source: SourceFileInput, options: LexOptions = {}): LexResul
 
   const push = (kind: TokenKind, start: number, end: number): void => {
     tokens.push({ kind, text: text.slice(start, end), span: spanOf(start, end) });
+  };
+
+  // Interpolated strings: `"a\(x)b"` lexes as Head `"a\(`, the expression's
+  // normal tokens, then Tail `)b"` (or Middle `)b\(` when more parts follow).
+  // Each entry tracks unclosed '(' inside the current interpolation so a
+  // nested call's ')' doesn't end it. Nested strings nest naturally.
+  const interpolationParens: number[] = [];
+
+  /**
+   * Scans string text starting at `start` (at the opening '"' or at the ')'
+   * that resumed the string) and emits the right segment token. Returns the
+   * position after the segment.
+   */
+  const scanStringSegment = (start: number): number => {
+    let cursor = start + 1; // skip the '"' or ')'
+    for (;;) {
+      if (cursor >= length || text.charCodeAt(cursor) === 10) {
+        report(
+          DiagnosticCodes.UnterminatedString,
+          'Unterminated string literal. Add a closing \'"\' before the end of the line.',
+          spanOf(start, cursor),
+        );
+        push(
+          text.charCodeAt(start) === 34 ? 'StringLiteral' : 'StringInterpolationTail',
+          start,
+          cursor,
+        );
+        return cursor;
+      }
+      const c = text.charCodeAt(cursor);
+      if (c === 34 /* " */) {
+        cursor++;
+        push(text.charCodeAt(start) === 34 ? 'StringLiteral' : 'StringInterpolationTail', start, cursor);
+        return cursor;
+      }
+      if (c === 92 /* \ */ && text.charCodeAt(cursor + 1) === 40 /* ( */) {
+        cursor += 2;
+        push(
+          text.charCodeAt(start) === 34 ? 'StringInterpolationHead' : 'StringInterpolationMiddle',
+          start,
+          cursor,
+        );
+        interpolationParens.push(0);
+        return cursor;
+      }
+      if (c === 92 && cursor + 1 < length && text.charCodeAt(cursor + 1) !== 10) {
+        cursor += 2; // ordinary escape; an escaped quote can't end the string
+        continue;
+      }
+      cursor++;
+    }
   };
 
   while (pos < length) {
@@ -183,39 +259,30 @@ export function lex(source: SourceFileInput, options: LexOptions = {}): LexResul
       continue;
     }
 
-    // String literal.
+    // String literal, plain or interpolated.
     if (code === 34 /* " */) {
-      pos++;
-      let terminated = false;
-      while (pos < length) {
-        const c = text.charCodeAt(pos);
-        if (c === 34) {
-          pos++;
-          terminated = true;
-          break;
-        }
-        if (c === 10) {
-          break; // A newline ends an unterminated string.
-        }
-        if (c === 92 /* \ */ && pos + 1 < length && text.charCodeAt(pos + 1) !== 10) {
-          // Skip the escaped character so an escaped quote can't end the
-          // string early. A backslash right before a newline is *not*
-          // treated as escaping the newline — an unescaped line break always
-          // ends an unterminated string, even if the last character before
-          // it was a backslash.
-          pos += 2;
-          continue;
-        }
-        pos++;
+      pos = scanStringSegment(pos);
+      continue;
+    }
+
+    // Parentheses inside an active interpolation: balance them so the ')'
+    // that ends the interpolation is recognized, then resume string mode.
+    if (interpolationParens.length > 0 && code === 40 /* ( */) {
+      interpolationParens[interpolationParens.length - 1]!++;
+      push('LeftParen', pos, pos + 1);
+      pos += 1;
+      continue;
+    }
+    if (interpolationParens.length > 0 && code === 41 /* ) */) {
+      const depth = interpolationParens[interpolationParens.length - 1]!;
+      if (depth > 0) {
+        interpolationParens[interpolationParens.length - 1] = depth - 1;
+        push('RightParen', pos, pos + 1);
+        pos += 1;
+        continue;
       }
-      if (!terminated) {
-        report(
-          DiagnosticCodes.UnterminatedString,
-          'Unterminated string literal. Add a closing \'"\' before the end of the line.',
-          spanOf(start, pos),
-        );
-      }
-      push('StringLiteral', start, pos);
+      interpolationParens.pop();
+      pos = scanStringSegment(pos);
       continue;
     }
 

@@ -57,6 +57,7 @@ export interface OptionalTypeRef extends AstNode {
 
 export type Expression =
   | StringLiteral
+  | InterpolatedStringExpression
   | IntLiteral
   | FloatLiteral
   | BoolLiteral
@@ -65,12 +66,27 @@ export type Expression =
   | MemberAccessExpression
   | CallExpression
   | BinaryExpression
-  | UnaryExpression;
+  | UnaryExpression
+  | MatchExpression
+  | TryExpression;
 
 export interface StringLiteral extends AstNode {
   readonly kind: 'StringLiteral';
   /** The decoded value (escapes resolved). */
   readonly value: string;
+}
+
+/** One literal text segment of an interpolated string. */
+export interface StringTextPart extends AstNode {
+  readonly kind: 'StringTextPart';
+  /** The decoded value (escapes resolved); may be empty. */
+  readonly value: string;
+}
+
+/** `"Hello, \(name)!"` — text parts and expressions, in source order. */
+export interface InterpolatedStringExpression extends AstNode {
+  readonly kind: 'InterpolatedString';
+  readonly parts: readonly (StringTextPart | Expression)[];
 }
 
 export interface IntLiteral extends AstNode {
@@ -98,11 +114,12 @@ export interface IdentifierExpression extends AstNode {
   readonly name: string;
 }
 
-/** `expr.name` */
+/** `expr.name`, or `expr?.name` when `optionalChaining` is set. */
 export interface MemberAccessExpression extends AstNode {
   readonly kind: 'MemberAccess';
   readonly object: Expression;
   readonly member: NameNode;
+  readonly optionalChaining: boolean;
 }
 
 /** One call argument; `name` is present for named arguments like `id: value`. */
@@ -132,7 +149,8 @@ export type BinaryOperator =
   | '>'
   | '>='
   | '&&'
-  | '||';
+  | '||'
+  | '??';
 
 export interface BinaryExpression extends AstNode {
   readonly kind: 'Binary';
@@ -149,11 +167,45 @@ export interface UnaryExpression extends AstNode {
   readonly operand: Expression;
 }
 
+/**
+ * `match value { case -> expr ... }` — an expression that inspects an enum
+ * or error value. The checker enforces exhaustiveness (Constitution,
+ * Document 4 §21) and restricts match to positions every target can emit
+ * cleanly: let initializers and return values.
+ */
+export interface MatchExpression extends AstNode {
+  readonly kind: 'Match';
+  readonly scrutinee: Expression;
+  readonly arms: readonly MatchArm[];
+  /** The `else -> expr` arm, when present. */
+  readonly elseArm?: Expression;
+}
+
+export interface MatchArm extends AstNode {
+  readonly kind: 'MatchArm';
+  readonly caseName: NameNode;
+  /** Positional bindings for the case payload, e.g. `cancelled(reason)`. */
+  readonly bindings: readonly NameNode[];
+  readonly body: Expression;
+}
+
+/** `try f(...)` — marks a call into a throwing function. */
+export interface TryExpression extends AstNode {
+  readonly kind: 'Try';
+  readonly expression: Expression;
+}
+
 // ---------------------------------------------------------------------------
 // Statements
 // ---------------------------------------------------------------------------
 
-export type Statement = LetStatement | ReturnStatement | IfStatement | ExpressionStatement;
+export type Statement =
+  | LetStatement
+  | ReturnStatement
+  | IfStatement
+  | IfLetStatement
+  | ThrowStatement
+  | ExpressionStatement;
 
 export interface Block extends AstNode {
   readonly kind: 'Block';
@@ -178,7 +230,22 @@ export interface IfStatement extends AstNode {
   readonly kind: 'IfStatement';
   readonly condition: Expression;
   readonly thenBlock: Block;
-  readonly elseBlock?: Block | IfStatement;
+  readonly elseBlock?: Block | IfStatement | IfLetStatement;
+}
+
+/** `if let name = optionalExpr { ... } else { ... }` — unwraps an optional. */
+export interface IfLetStatement extends AstNode {
+  readonly kind: 'IfLetStatement';
+  readonly name: NameNode;
+  readonly value: Expression;
+  readonly thenBlock: Block;
+  readonly elseBlock?: Block | IfStatement | IfLetStatement;
+}
+
+/** `throw ErrorType.case(...)` — only valid inside a throws function. */
+export interface ThrowStatement extends AstNode {
+  readonly kind: 'ThrowStatement';
+  readonly value: Expression;
 }
 
 export interface ExpressionStatement extends AstNode {

@@ -147,6 +147,24 @@ Model construction (`User(id: x, name: y)`) emits:
 - **TypeScript**: `{ id: x, name: y }` object literal (checked against the
   interface).
 
+## Expression and control-flow mappings
+
+| ClearKrypt | Swift | Kotlin | TypeScript |
+| ---------- | ----- | ------ | ---------- |
+| `"a\(x)b"` | `"a\(x)b"` | `"a${x}b"` (with `$` escaped in literals) | `` `a${x}b` `` |
+| `a ?? b` | `a ?? b` | `a ?: b` | `a ?? b` (parenthesized when mixing with `&&`/`\|\|`) |
+| `a?.b` | `a?.b` | `a?.b` | `(a?.b ?? null)` — normalized so absence stays `null`, except directly before `??` |
+| `if let x = v { }` | `if let x = v { }` | `val x = v; if (x != null) { }` (smart cast) | `const x = v; if (x !== null) { }` (narrowing) |
+| `Status.pending` | `Status.pending` | `Status.Pending` | `'pending'` (simple) / `{ kind: 'pending' }` (associated) |
+| `E.server(message: m)` | `E.server(message: m)` | `E.Server(message = m)` | `{ kind: 'server', message: m }` |
+| `match` | `switch` expression (Swift 5.9+) | `when` expression (`when (val matched = ...)` only when payload arms bind) | exhaustive `switch` (on the value or `.kind`), IIFE in let position, plus an unreachable-guard `throw` |
+| `throw e` | `throw e` | `throw e` (errors extend `Exception`) | `throw e` (plain tagged object; helper guards are a later milestone) |
+| `try f(x)` | `try f(x)` | `f(x)` (JVM propagation) | `f(x)` (JS propagation) |
+
+Match exhaustiveness is proven by the checker (CK0014), so the generated
+switches never rely on target-side exhaustiveness analysis — but they keep
+it where the target offers it (Kotlin `when` over sealed types).
+
 ## Not yet emitted (honest limitations)
 
 Per the target honesty law, the following parse and type-check but are
@@ -168,6 +186,9 @@ each such declaration at lowering time, rather than silently dropping them
   do not participate in `data class` structural `equals`/`hashCode` the way
   value collections do. This is a documented Kotlin platform behavior, not a
   ClearKrypt bug; a value-semantics wrapper is a candidate improvement.
+- **Async call sites**: `async` functions parse, check, and emit with the
+  right signatures, but calling one requires `await` support, which lands
+  with the async milestone. The checker does not yet reject cross-calls.
 - **IR expression origins**: declarations, fields, and params carry source
   origins; individual expressions do not yet. Emitter diagnostics for
   malformed expressions cite the enclosing declaration's span. Tightening

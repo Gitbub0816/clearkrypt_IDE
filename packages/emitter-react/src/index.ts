@@ -11,7 +11,7 @@ import { createContext, TsCtx } from './context';
 import { renderEnum, renderErrorType, renderFunction, renderModel } from './declarations';
 import { unsupportedFeature } from './diagnostics';
 import { moduleHeader } from './header';
-import { buildModelIndex } from './modelIndex';
+import { buildEnumIndex, buildModelIndex } from './modelIndex';
 import { modulePath } from './naming';
 import { relativeImportSpecifier } from './paths';
 import { buildSupportFile } from './support';
@@ -39,6 +39,7 @@ export function emitReact(project: IrProject, options: EmitOptions): EmitResult 
   const diagnostics: Diagnostic[] = [];
   const files: GeneratedFile[] = [];
   const modelIndex = buildModelIndex(project);
+  const enumIndex = buildEnumIndex(project);
 
   for (const module of project.modules) {
     // "The TS module file exists if the module has any declarations."
@@ -46,7 +47,7 @@ export function emitReact(project: IrProject, options: EmitOptions): EmitResult 
       continue;
     }
 
-    const ctx = createContext(module.name, modelIndex, diagnostics);
+    const ctx = createContext(module.name, modelIndex, enumIndex, diagnostics);
     const header = moduleHeader(options.compilerVersion, module.file, module.name);
     const groups: (readonly string[])[] = [];
 

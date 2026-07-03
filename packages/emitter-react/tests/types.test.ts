@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Diagnostic, IrOrigin, IrType, irSamples } from '@clearkrypt/compiler-core';
 import { createContext } from '../src/context';
-import { buildModelIndex } from '../src/modelIndex';
+import { buildEnumIndex, buildModelIndex } from '../src/modelIndex';
 import { renderType } from '../src/types';
 
 const origin: IrOrigin = {
@@ -12,7 +12,7 @@ const origin: IrOrigin = {
 
 function render(type: IrType) {
   const diagnostics: Diagnostic[] = [];
-  const ctx = createContext('app.test', buildModelIndex({ modules: [] }), diagnostics);
+  const ctx = createContext('app.test', buildModelIndex({ modules: [] }), buildEnumIndex({ modules: [] }), diagnostics);
   const text = renderType(type, origin, ctx);
   return { text, typeImports: ctx.typeImports, diagnostics };
 }
@@ -72,7 +72,7 @@ describe('TypeScript type rendering', () => {
 
   it('reports CK0004 instead of throwing on an unrecognized type kind', () => {
     const diagnostics: Diagnostic[] = [];
-    const ctx = createContext('app.test', buildModelIndex({ modules: [] }), diagnostics);
+    const ctx = createContext('app.test', buildModelIndex({ modules: [] }), buildEnumIndex({ modules: [] }), diagnostics);
     const bogus = { kind: 'bogus' } as unknown as IrType;
     const text = renderType(bogus, origin, ctx);
     expect(text).toBeTruthy();

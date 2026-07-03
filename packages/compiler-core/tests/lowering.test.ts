@@ -42,6 +42,11 @@ describe('lowerProject - IR snapshots', () => {
     expect(printIr(result.project)).toMatchSnapshot();
   });
 
+  it('lowers the power pack: match, optionals, interpolation, throw, try', () => {
+    const result = lowerFixtures(['syntax/power-pack.ck']);
+    expect(printIr(result.project)).toMatchSnapshot();
+  });
+
   it('lowers enums and computes isSimple', () => {
     const result = lowerFixtures(['syntax/enum-only.ck', 'syntax/enum-associated.ck']);
     const modules = result.project.modules;

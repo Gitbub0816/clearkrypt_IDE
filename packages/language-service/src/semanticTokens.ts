@@ -63,7 +63,14 @@ function classify(
     return { type: 'nativeTarget', modifiers: 0 };
   }
   if (kind.startsWith('Kw')) return { type: 'keyword', modifiers: 0 };
-  if (kind === 'StringLiteral') return { type: 'string', modifiers: 0 };
+  if (
+    kind === 'StringLiteral' ||
+    kind === 'StringInterpolationHead' ||
+    kind === 'StringInterpolationMiddle' ||
+    kind === 'StringInterpolationTail'
+  ) {
+    return { type: 'string', modifiers: 0 };
+  }
   if (kind === 'IntLiteral' || kind === 'FloatLiteral') return { type: 'number', modifiers: 0 };
   if (kind === 'LineComment' || kind === 'BlockComment') return { type: 'comment', modifiers: 0 };
   if (isOperator(kind)) return { type: 'operator', modifiers: 0 };
@@ -90,6 +97,8 @@ function isOperator(kind: Token['kind']): boolean {
     case 'Bang':
     case 'Equals':
     case 'Question':
+    case 'QuestionDot':
+    case 'QuestionQuestion':
       return true;
     default:
       return false;

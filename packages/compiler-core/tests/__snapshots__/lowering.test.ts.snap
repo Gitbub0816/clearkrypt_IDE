@@ -43,6 +43,49 @@ exports[`lowerProject - IR snapshots > lowers hello-world 1`] = `
 "
 `;
 
+exports[`lowerProject - IR snapshots > lowers the power pack: match, optionals, interpolation, throw, try 1`] = `
+"Module app.orders (syntax/power-pack.ck)
+  Enum OrderStatus (simple)
+    Case pending
+    Case shipped
+    Case delivered
+  Error OrderError
+    Case notFound
+    Case rejected(reason: String)
+  Model Customer
+    Field name: String
+  Model Order
+    Field id: ID
+    Field label: String
+    Field note: String?
+    Field customer: Customer?
+    Field status: OrderStatus
+  Function statusLabel(status: OrderStatus) -> String
+    Let label: String = match(param(status) : OrderStatus) { pending -> "waiting" : String; shipped -> "on the way" : String; delivered -> "done" : String } : String
+    Return local(label) : String
+  Function describe(order: Order) -> String
+    Let note: String = (param(order) : Order.note : String? ?? "no note" : String) : String
+    Return interp("Order \\(param(order) : Order.label : String) (\\(call app.orders.statusLabel(status: param(order) : Order.status : OrderStatus) : String)): \\(local(note) : String)") : String
+  Function customerName(order: Order) -> String
+    Return (param(order) : Order.customer : Customer??.name : String? ?? "anonymous" : String) : String
+  Function noteLength(order: Order) -> Int
+    IfLet note: String = param(order) : Order.note : String?
+      Return call app.orders.lengthOf(text: local(note) : String) : Int
+    Else
+      Return 0 : Int
+  Function lengthOf(text: String) -> Int
+    Return 1 : Int
+  Function requireShipped(status: OrderStatus) throws OrderError -> String
+    Return match(param(status) : OrderStatus) { shipped -> "ok" : String; else -> "not yet" : String } : String
+  Function checkOrder(order: Order) throws OrderError -> String
+    If (param(order) : Order.label : String == "" : String) : Bool
+      Throw case OrderError.rejected(reason: "missing label" : String) : OrderError
+    Return try call app.orders.requireShipped(status: param(order) : Order.status : OrderStatus) : String
+  Function defaultStatus() -> OrderStatus
+    Return case OrderStatus.pending : OrderStatus
+"
+`;
+
 exports[`lowerProject - IR snapshots > lowers the two-modules project with cross-module references 1`] = `
 "Module app.models (projects/two-modules/src/models.ck)
   Model User

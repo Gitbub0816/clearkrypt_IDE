@@ -73,6 +73,20 @@ function printStatement(statement: IrStatement, lines: string[], indent: string)
         for (const s of statement.else) printStatement(s, lines, indent + '  ');
       }
       break;
+    case 'ifLet':
+      lines.push(
+        `${indent}IfLet ${statement.name}: ${printType(statement.type)} = ` +
+          printExpression(statement.value),
+      );
+      for (const s of statement.then) printStatement(s, lines, indent + '  ');
+      if (statement.else) {
+        lines.push(`${indent}Else`);
+        for (const s of statement.else) printStatement(s, lines, indent + '  ');
+      }
+      break;
+    case 'throw':
+      lines.push(`${indent}Throw ${printExpression(statement.value)}`);
+      break;
     case 'expr':
       lines.push(`${indent}Expr ${printExpression(statement.expression)}`);
       break;
@@ -96,7 +110,38 @@ function printExpression(expr: IrExpression): string {
     case 'paramRef':
       return `param(${expr.name}) : ${printType(expr.type)}`;
     case 'fieldAccess':
-      return `${printExpression(expr.object)}.${expr.field} : ${printType(expr.type)}`;
+      return (
+        `${printExpression(expr.object)}${expr.optionalChaining ? '?.' : '.'}${expr.field}` +
+        ` : ${printType(expr.type)}`
+      );
+    case 'interpolatedString':
+      return (
+        'interp("' +
+        expr.parts
+          .map((p) => (p.kind === 'text' ? p.value : '\\(' + printExpression(p) + ')'))
+          .join('') +
+        `") : ${printType(expr.type)}`
+      );
+    case 'enumValue':
+      return (
+        `case ${expr.enumType.name}.${expr.caseName}` +
+        (expr.args.length > 0
+          ? `(${expr.args.map((a) => `${a.name}: ${printExpression(a.value)}`).join(', ')})`
+          : '') +
+        ` : ${printType(expr.type)}`
+      );
+    case 'match': {
+      const arms = expr.arms
+        .map(
+          (arm) =>
+            `${arm.caseName}${arm.bindings.length > 0 ? `(${arm.bindings.map((b) => b.name).join(', ')})` : ''} -> ${printExpression(arm.body)}`,
+        )
+        .join('; ');
+      const elsePart = expr.elseBody ? `; else -> ${printExpression(expr.elseBody)}` : '';
+      return `match(${printExpression(expr.scrutinee)}) { ${arms}${elsePart} } : ${printType(expr.type)}`;
+    }
+    case 'try':
+      return `try ${printExpression(expr.expression)}`;
     case 'call':
       return (
         `call ${expr.function.module}.${expr.function.name}(` +

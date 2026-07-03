@@ -63,6 +63,10 @@ describe('checkProject - invalid fixtures', () => {
     { fixture: 'semantic/invalid/missing-return.ck', code: 'CK0007', line: 3 },
     { fixture: 'semantic/invalid/wrong-argument-count.ck', code: 'CK0009', line: 8 },
     { fixture: 'semantic/invalid/type-mismatch.ck', code: 'CK0003', line: 4 },
+    { fixture: 'semantic/invalid/non-exhaustive-match.ck', code: 'CK0014', line: 10 },
+    { fixture: 'semantic/invalid/coalesce-non-optional.ck', code: 'CK0003', line: 4 },
+    { fixture: 'semantic/invalid/missing-try.ck', code: 'CK0017', line: 12 },
+    { fixture: 'semantic/invalid/throw-outside-throws.ck', code: 'CK0016', line: 8 },
   ];
 
   for (const c of cases) {

@@ -122,6 +122,50 @@ exports[`parseSource - valid fixtures > parses syntax/native-binding.ck with zer
 "
 `;
 
+exports[`parseSource - valid fixtures > parses syntax/power-pack.ck with zero diagnostics 1`] = `
+"SourceFile syntax/power-pack.ck 1:1-73:1
+  Module app.orders 1:1-1:18
+  Enum OrderStatus 3:1-7:2
+    Case pending 4:3-4:10
+    Case shipped 5:3-5:10
+    Case delivered 6:3-6:12
+  Error OrderError 9:1-12:2
+    Case notFound 10:3-10:11
+    Case rejected(reason: String) 11:3-11:27
+  Model Customer 14:1-16:2
+    Field name: String 15:3-15:15
+  Model Order 18:1-24:2
+    Field id: ID 19:3-19:9
+    Field label: String 20:3-20:16
+    Field note: String? 21:3-21:16
+    Field customer: Customer? 22:3-22:22
+    Field status: OrderStatus 23:3-23:22
+  Function statusLabel(status: OrderStatus) -> String 26:1-33:2
+    Let label = match status { pending -> "waiting"; shipped -> "on the way"; delivered -> "done" } 27:3-31:4
+    Return label 32:3-32:15
+  Function describe(order: Order) -> String 35:1-38:2
+    Let note = order.note ?? "no note" 36:3-36:37
+    Return "Order \\(order.label) (\\(statusLabel(status: order.status))): \\(note)" 37:3-37:80
+  Function customerName(order: Order) -> String 40:1-42:2
+    Return order.customer?.name ?? "anonymous" 41:3-41:45
+  Function noteLength(order: Order) -> Int 44:1-50:2
+    IfLet note = order.note 45:3-49:4
+      Return lengthOf(text: note) 46:5-46:32
+    Else 47:10-49:4
+      Return 0 48:5-48:13
+  Function lengthOf(text: String) -> Int 52:1-54:2
+    Return 1 53:3-53:11
+  Function requireShipped(status: OrderStatus) throws OrderError -> String 56:1-61:2
+    Return match status { shipped -> "ok"; else -> "not yet" } 57:3-60:4
+  Function checkOrder(order: Order) throws OrderError -> String 63:1-68:2
+    If order.label == "" 64:3-66:4
+      Throw OrderError.rejected(reason: "missing label") 65:5-65:55
+    Return try requireShipped(status: order.status) 67:3-67:50
+  Function defaultStatus() -> OrderStatus 70:1-72:2
+    Return OrderStatus.pending 71:3-71:29
+"
+`;
+
 exports[`parseSource - valid fixtures > parses syntax/screen-component.ck with zero diagnostics 1`] = `
 "SourceFile syntax/screen-component.ck 1:1-25:1
   Module app.ui 1:1-1:14

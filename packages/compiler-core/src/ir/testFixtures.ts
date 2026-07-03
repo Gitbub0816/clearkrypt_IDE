@@ -158,6 +158,7 @@ export function sampleHelloWorldModule(): IrProject {
         kind: 'return',
         value: {
           kind: 'fieldAccess',
+          optionalChaining: false,
           object: { kind: 'paramRef', name: 'greeting', type: greetingType },
           field: 'message',
           type: primitive('String'),
@@ -405,6 +406,7 @@ export function sampleCrossModuleProject(): IrProject {
           left: { kind: 'stringLiteral', value: 'Welcome, ', type: primitive('String') },
           right: {
             kind: 'fieldAccess',
+          optionalChaining: false,
             object: { kind: 'paramRef', name: 'user', type: userType },
             field: 'name',
             type: primitive('String'),

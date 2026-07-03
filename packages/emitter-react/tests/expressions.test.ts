@@ -10,7 +10,7 @@ import {
 } from '@clearkrypt/compiler-core';
 import { createContext } from '../src/context';
 import { escapeStringLiteral, renderExpr } from '../src/expressions';
-import { buildModelIndex } from '../src/modelIndex';
+import { buildEnumIndex, buildModelIndex } from '../src/modelIndex';
 
 const origin: IrOrigin = {
   file: 'fixture.ck',
@@ -28,7 +28,7 @@ function bin(operator: IrBinaryOperator, left: IrExpression, right: IrExpression
 
 function render(expr: IrExpression, project: IrProject = { modules: [] }): string {
   const diagnostics: Diagnostic[] = [];
-  const ctx = createContext('app.test', buildModelIndex(project), diagnostics);
+  const ctx = createContext('app.test', buildModelIndex(project), buildEnumIndex(project), diagnostics);
   return renderExpr(expr, origin, ctx);
 }
 
@@ -55,7 +55,7 @@ describe('TypeScript precedence-aware parenthesization', () => {
 describe('TypeScript call rendering', () => {
   it('calls with positional arguments and imports cross-module functions as values', () => {
     const diagnostics: Diagnostic[] = [];
-    const ctx = createContext('app.api', buildModelIndex({ modules: [] }), diagnostics);
+    const ctx = createContext('app.api', buildModelIndex({ modules: [] }), buildEnumIndex({ modules: [] }), diagnostics);
     const call: IrExpression = {
       kind: 'call',
       function: { name: 'fullName', module: 'app.text' },
@@ -102,7 +102,7 @@ describe('TypeScript model construction', () => {
       { name: 'message', value: { kind: 'stringLiteral', value: 'hi', type: irSamples.primitive('String') } },
     ]);
     const diagnostics: Diagnostic[] = [];
-    const ctx = createContext('app.api', buildModelIndex(project), diagnostics);
+    const ctx = createContext('app.api', buildModelIndex(project), buildEnumIndex(project), diagnostics);
     const text = renderExpr(expr, origin, ctx);
     expect(text).toBe('createGreeting({ id: "g1", message: "hi" })');
     expect(ctx.valueImports.get('app.models')).toEqual(new Set(['createGreeting']));
@@ -114,7 +114,7 @@ describe('TypeScript model construction', () => {
       { name: 'message', value: { kind: 'stringLiteral', value: 'hi', type: irSamples.primitive('String') } },
     ]);
     const diagnostics: Diagnostic[] = [];
-    const ctx = createContext('app.models', buildModelIndex(project), diagnostics);
+    const ctx = createContext('app.models', buildModelIndex(project), buildEnumIndex(project), diagnostics);
     renderExpr(expr, origin, ctx);
     expect(ctx.valueImports.size).toBe(0);
   });
@@ -123,7 +123,7 @@ describe('TypeScript model construction', () => {
 describe('unsupported expression handling', () => {
   it('reports CK0004 instead of throwing on an unrecognized expression kind', () => {
     const diagnostics: Diagnostic[] = [];
-    const ctx = createContext('app.test', buildModelIndex({ modules: [] }), diagnostics);
+    const ctx = createContext('app.test', buildModelIndex({ modules: [] }), buildEnumIndex({ modules: [] }), diagnostics);
     const bogus = { kind: 'bogus' } as unknown as IrExpression;
     const text = renderExpr(bogus, origin, ctx);
     expect(text).toBeTruthy();

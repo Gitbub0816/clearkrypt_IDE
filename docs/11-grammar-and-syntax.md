@@ -142,6 +142,44 @@ screen ProfileScreen(user: User) {
 route /profile/:id -> ProfileScreen(id: ID)
 ```
 
+## String interpolation
+
+```ck
+"Order \(order.label): \(note)"
+```
+
+## Match expressions
+
+```ck
+let label = match status {
+  pending -> "waiting"
+  cancelled(reason) -> "cancelled: \(reason)"
+  else -> "other"
+}
+```
+
+Arms are `case -> expression` (payload bindings positional); `else ->`
+covers the rest. The checker enforces exhaustiveness. Match appears as a
+let initializer or return value.
+
+## Optionals in expressions
+
+```ck
+order.note ?? "fallback"
+order.customer?.name
+if let note = order.note { }
+```
+
+`??` binds tighter than comparisons and looser than arithmetic
+(right-associative), matching Swift.
+
+## Throw and try
+
+```ck
+throw OrderError.rejected(reason: "why")
+return try requireShipped(status: status)
+```
+
 ## Native blocks
 
 ```ck

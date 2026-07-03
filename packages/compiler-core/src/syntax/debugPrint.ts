@@ -85,7 +85,29 @@ function renderExpr(expr: Expression): string {
     case 'Identifier':
       return expr.name;
     case 'MemberAccess':
-      return `${renderExpr(expr.object)}.${expr.member.text}`;
+      return `${renderExpr(expr.object)}${expr.optionalChaining ? '?.' : '.'}${expr.member.text}`;
+    case 'InterpolatedString':
+      return (
+        '"' +
+        expr.parts
+          .map((p) => (p.kind === 'StringTextPart' ? p.value : '\\(' + renderExpr(p) + ')'))
+          .join('') +
+        '"'
+      );
+    case 'Match': {
+      const arms = expr.arms
+        .map(
+          (arm) =>
+            `${arm.caseName.text}${
+              arm.bindings.length > 0 ? `(${arm.bindings.map((b) => b.text).join(', ')})` : ''
+            } -> ${renderExpr(arm.body)}`,
+        )
+        .join('; ');
+      const elsePart = expr.elseArm ? `; else -> ${renderExpr(expr.elseArm)}` : '';
+      return `match ${renderExpr(expr.scrutinee)} { ${arms}${elsePart} }`;
+    }
+    case 'Try':
+      return `try ${renderExpr(expr.expression)}`;
     case 'Call':
       return `${renderExpr(expr.callee)}(${expr.args.map(renderArgument).join(', ')})`;
     case 'Binary':
@@ -251,6 +273,16 @@ function printStatement(stmt: Statement, depth: number, push: Push): void {
     case 'IfStatement':
       printIf(stmt, depth, push);
       return;
+    case 'IfLetStatement':
+      push(depth, `IfLet ${stmt.name.text} = ${renderExpr(stmt.value)} ${loc(stmt)}`);
+      for (const s of stmt.thenBlock.statements) {
+        printStatement(s, depth + 1, push);
+      }
+      printElse(stmt.elseBlock, depth, push);
+      return;
+    case 'ThrowStatement':
+      push(depth, `Throw ${renderExpr(stmt.value)} ${loc(stmt)}`);
+      return;
     case 'ExpressionStatement':
       push(depth, `Expr ${renderExpr(stmt.expression)} ${loc(stmt)}`);
       return;
@@ -262,14 +294,21 @@ function printIf(stmt: Extract<Statement, { kind: 'IfStatement' }>, depth: numbe
   for (const s of stmt.thenBlock.statements) {
     printStatement(s, depth + 1, push);
   }
-  if (stmt.elseBlock) {
-    push(depth, `Else ${loc(stmt.elseBlock)}`);
-    if (stmt.elseBlock.kind === 'IfStatement') {
-      printStatement(stmt.elseBlock, depth + 1, push);
-    } else {
-      for (const s of stmt.elseBlock.statements) {
-        printStatement(s, depth + 1, push);
-      }
+  printElse(stmt.elseBlock, depth, push);
+}
+
+function printElse(
+  elseBlock: Extract<Statement, { kind: 'IfStatement' }>['elseBlock'],
+  depth: number,
+  push: Push,
+): void {
+  if (!elseBlock) return;
+  push(depth, `Else ${loc(elseBlock)}`);
+  if (elseBlock.kind === 'IfStatement' || elseBlock.kind === 'IfLetStatement') {
+    printStatement(elseBlock, depth + 1, push);
+  } else {
+    for (const s of elseBlock.statements) {
+      printStatement(s, depth + 1, push);
     }
   }
 }

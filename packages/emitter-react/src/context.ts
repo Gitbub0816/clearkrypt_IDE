@@ -1,5 +1,5 @@
 import { Diagnostic } from '@clearkrypt/compiler-core';
-import { ModelIndex } from './modelIndex';
+import { EnumIndex, ModelIndex } from './modelIndex';
 
 /**
  * Per-file render context.
@@ -14,12 +14,25 @@ export interface TsCtx {
   readonly diagnostics: Diagnostic[];
   readonly currentModule: string;
   readonly modelIndex: ModelIndex;
+  readonly enumIndex: EnumIndex;
   readonly typeImports: Map<string, Set<string>>;
   readonly valueImports: Map<string, Set<string>>;
 }
 
-export function createContext(currentModule: string, modelIndex: ModelIndex, diagnostics: Diagnostic[]): TsCtx {
-  return { diagnostics, currentModule, modelIndex, typeImports: new Map(), valueImports: new Map() };
+export function createContext(
+  currentModule: string,
+  modelIndex: ModelIndex,
+  enumIndex: EnumIndex,
+  diagnostics: Diagnostic[],
+): TsCtx {
+  return {
+    diagnostics,
+    currentModule,
+    modelIndex,
+    enumIndex,
+    typeImports: new Map(),
+    valueImports: new Map(),
+  };
 }
 
 function addImport(map: Map<string, Set<string>>, currentModule: string, moduleKey: string, name: string): void {

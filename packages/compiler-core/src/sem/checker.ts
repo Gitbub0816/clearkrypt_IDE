@@ -11,6 +11,11 @@ import {
   Expression,
   FunctionDecl,
   IdentifierExpression,
+  InterpolatedStringExpression,
+  MatchArm,
+  MatchExpression,
+  MemberAccessExpression,
+  NameNode,
   NativeFunctionDecl,
   NativeTarget,
   ParamDecl,
@@ -63,6 +68,16 @@ export interface CheckedProject {
   readonly callResolutions: ReadonlyMap<CallExpression, CallResolution>;
   /** Resolved semantic type of every written type reference. */
   readonly typeRefTypes: ReadonlyMap<TypeRef, SemType>;
+  /** Resolved payload bindings for every checked match arm: binding name, declared field, type. */
+  readonly matchArmFields: ReadonlyMap<
+    MatchArm,
+    readonly { name: string; field: string; type: SemType }[]
+  >;
+  /** Enum/error case values (`Status.pending`, `E.server(message: x)`), keyed by node. */
+  readonly enumValues: ReadonlyMap<
+    Expression,
+    { readonly caseName: string; readonly args: readonly { name: string; value: Expression }[] }
+  >;
 }
 
 export function checkProject(sources: readonly SourceFileInput[]): CheckedProject {
@@ -83,6 +98,8 @@ export function checkParsedProject(
 
 interface FunctionContext {
   readonly returnType: SemType;
+  /** The declared throws type of the enclosing function, when it has one. */
+  readonly throwsType?: SemType;
   /** Innermost scope last. Scope 0 holds parameters. */
   readonly scopes: Map<string, { type: SemType; kind: 'local' | 'param' }>[];
   /** Import + module scope for the enclosing file. */
@@ -102,6 +119,14 @@ class Checker {
   private readonly identifierKinds = new Map<IdentifierExpression, 'local' | 'param'>();
   private readonly callResolutions = new Map<CallExpression, CallResolution>();
   private readonly typeRefTypes = new Map<TypeRef, SemType>();
+  private readonly matchArmFields = new Map<
+    MatchArm,
+    { name: string; field: string; type: SemType }[]
+  >();
+  private readonly enumValues = new Map<
+    Expression,
+    { caseName: string; args: { name: string; value: Expression }[] }
+  >();
 
   check(
     parsed: readonly { file: SourceFileNode; diagnostics: readonly Diagnostic[] }[],
@@ -130,6 +155,8 @@ class Checker {
       identifierKinds: this.identifierKinds,
       callResolutions: this.callResolutions,
       typeRefTypes: this.typeRefTypes,
+      matchArmFields: this.matchArmFields,
+      enumValues: this.enumValues,
     };
   }
 
@@ -621,8 +648,10 @@ class Checker {
       }
     }
 
+    const throwsType = decl.throwsType ? this.typeRefTypes.get(decl.throwsType) : undefined;
     const ctx: FunctionContext = {
       returnType,
+      throwsType,
       scopes: [new Map([...params].map(([name, type]) => [name, { type, kind: 'param' as const }]))],
       fileScope: scope,
     };
@@ -755,7 +784,10 @@ class Checker {
             break;
           }
         }
-        const initializerType = this.checkExpression(statement.initializer, ctx);
+        const initializerType =
+          statement.initializer.kind === 'Match'
+            ? this.checkMatch(statement.initializer, ctx)
+            : this.checkExpression(statement.initializer, ctx);
         let bindingType: SemType;
         if (statement.declaredType) {
           bindingType = this.resolveTypeRef(statement.declaredType, ctx.fileScope, false);
@@ -783,7 +815,10 @@ class Checker {
         const wantsVoid =
           ctx.returnType.kind === 'primitive' && ctx.returnType.name === 'Void';
         if (statement.value) {
-          const valueType = this.checkExpression(statement.value, ctx);
+          const valueType =
+            statement.value.kind === 'Match'
+              ? this.checkMatch(statement.value, ctx)
+              : this.checkExpression(statement.value, ctx);
           if (wantsVoid) {
             this.report(
               DiagnosticCodes.TypeMismatch,
@@ -822,11 +857,66 @@ class Checker {
         let elseReturns = false;
         if (statement.elseBlock) {
           elseReturns =
-            statement.elseBlock.kind === 'IfStatement'
+            statement.elseBlock.kind === 'IfStatement' || statement.elseBlock.kind === 'IfLetStatement'
               ? this.checkStatement(statement.elseBlock, ctx)
               : this.checkBlock(statement.elseBlock, ctx);
         }
         return thenReturns && elseReturns;
+      }
+      case 'IfLetStatement': {
+        const name = statement.name.text;
+        for (const scope of ctx.scopes) {
+          if (scope.has(name)) {
+            this.report(
+              DiagnosticCodes.DuplicateDeclaration,
+              'error',
+              `'${name}' is already declared in this function. Choose a different name ` +
+                `for the if let binding.`,
+              statement.name.span,
+            );
+            break;
+          }
+        }
+        const valueType = this.checkExpression(statement.value, ctx);
+        let unwrapped: SemType = errorType;
+        if (valueType.kind === 'optional') {
+          unwrapped = valueType.inner;
+        } else if (valueType.kind !== 'error') {
+          this.report(
+            DiagnosticCodes.TypeMismatch,
+            'error',
+            `'if let' unwraps optional values, but this has type ` +
+              `'${typeToString(valueType)}'. Use a plain 'if' or make the value optional.`,
+            statement.value.span,
+          );
+        }
+        ctx.scopes.push(new Map([[name, { type: unwrapped, kind: 'local' as const }]]));
+        const thenReturns = this.checkBlock(statement.thenBlock, ctx);
+        ctx.scopes.pop();
+        let elseReturns = false;
+        if (statement.elseBlock) {
+          elseReturns =
+            statement.elseBlock.kind === 'IfStatement' || statement.elseBlock.kind === 'IfLetStatement'
+              ? this.checkStatement(statement.elseBlock, ctx)
+              : this.checkBlock(statement.elseBlock, ctx);
+        }
+        return thenReturns && elseReturns;
+      }
+      case 'ThrowStatement': {
+        const valueType = this.checkExpression(statement.value, ctx);
+        if (!ctx.throwsType) {
+          this.report(
+            DiagnosticCodes.InvalidThrow,
+            'error',
+            `'throw' is only allowed inside a function declared with ` +
+              `'throws <ErrorType>'. Add a throws clause to the enclosing function.`,
+            statement.span,
+          );
+        } else {
+          this.requireAssignable(valueType, ctx.throwsType, statement.value.span, 'The thrown value');
+        }
+        // A throw exits the function, so this path definitely "returns".
+        return true;
       }
       case 'ExpressionStatement': {
         this.checkExpression(statement.expression, ctx);
@@ -858,19 +948,39 @@ class Checker {
       case 'Identifier':
         return this.checkIdentifier(expr, ctx);
       case 'MemberAccess': {
+        // `EnumType.caseName` is a case value, not a field read.
+        const enumSymbol = this.enumSymbolFor(expr.object, ctx);
+        if (enumSymbol) {
+          return this.checkEnumCaseValue(expr, enumSymbol, [], ctx);
+        }
         const objectType = this.checkExpression(expr.object, ctx);
         if (objectType.kind === 'error') return errorType;
+
+        let fieldOwner: SemType = objectType;
         if (objectType.kind === 'optional') {
+          if (!expr.optionalChaining) {
+            this.report(
+              DiagnosticCodes.TypeMismatch,
+              'error',
+              `This value has type '${typeToString(objectType)}' and may be absent. ` +
+                `Use '?.' for optional access, or unwrap it first with ` +
+                `'if let ${describeUnwrapName(expr.object)} = ...'.`,
+              expr.span,
+            );
+            return errorType;
+          }
+          fieldOwner = objectType.inner;
+        } else if (expr.optionalChaining) {
           this.report(
             DiagnosticCodes.TypeMismatch,
             'error',
-            `This value has type '${typeToString(objectType)}' and may be absent. ` +
-              `Safe optional access is not available yet; model the data as non-optional for now.`,
-            expr.span,
+            `'?.' is for optional values, but this has type '${typeToString(objectType)}'. Use '.'.`,
+            expr.member.span,
           );
           return errorType;
         }
-        if (objectType.kind !== 'declared' || objectType.declarationKind !== 'model') {
+
+        if (fieldOwner.kind !== 'declared' || fieldOwner.declarationKind !== 'model') {
           this.report(
             DiagnosticCodes.TypeMismatch,
             'error',
@@ -879,21 +989,58 @@ class Checker {
           );
           return errorType;
         }
-        const model = this.modules.get(objectType.module)?.declarations.get(objectType.name);
+        const model = this.modules.get(fieldOwner.module)?.declarations.get(fieldOwner.name);
         if (!model || model.node.kind !== 'ModelDecl') return errorType;
         const field = model.node.fields.find((f) => f.name.text === expr.member.text);
         if (!field) {
           this.report(
             DiagnosticCodes.UnknownSymbol,
             'error',
-            `Model '${objectType.name}' has no field '${expr.member.text}'. ` +
+            `Model '${fieldOwner.name}' has no field '${expr.member.text}'. ` +
               `Fields: ${listNames(model.node.fields.map((f) => f.name.text))}.`,
             expr.member.span,
           );
           return errorType;
         }
-        return this.typeRefTypes.get(field.type) ?? this.resolveTypeRef(field.type, ctx.fileScope, false);
+        const fieldType =
+          this.typeRefTypes.get(field.type) ?? this.resolveTypeRef(field.type, ctx.fileScope, false);
+        if (!expr.optionalChaining) {
+          return fieldType;
+        }
+        // `?.` produces an optional; already-optional fields stay singly optional.
+        return fieldType.kind === 'optional' || fieldType.kind === 'error'
+          ? fieldType
+          : { kind: 'optional', inner: fieldType };
       }
+      case 'InterpolatedString': {
+        for (const part of expr.parts) {
+          if (part.kind === 'StringTextPart') continue;
+          const partType = this.checkExpression(part, ctx);
+          if (partType.kind !== 'primitive' && partType.kind !== 'error') {
+            this.report(
+              DiagnosticCodes.TypeMismatch,
+              'error',
+              `Only primitive values can be interpolated into strings; found ` +
+                `'${typeToString(partType)}'. Interpolate a specific field instead.`,
+              part.span,
+            );
+          }
+        }
+        return primitiveType('String');
+      }
+      case 'Match':
+        this.report(
+          DiagnosticCodes.InvalidMatch,
+          'error',
+          `A match expression must directly initialize a binding ('let x = match ...') or be ` +
+            `returned ('return match ...') so every target can emit it cleanly.`,
+          expr.span,
+        );
+        // Still check the arms so the user sees all their diagnostics at once.
+        this.checkMatch(expr, ctx);
+        return errorType;
+      case 'Try':
+        return this.checkTry(expr, ctx);
       case 'Call':
         return this.checkCall(expr, ctx);
       case 'Binary':
@@ -944,6 +1091,15 @@ class Checker {
       );
       return errorType;
     }
+    if (symbol && (symbol.kind === 'enum' || symbol.kind === 'error')) {
+      this.report(
+        DiagnosticCodes.TypeMismatch,
+        'error',
+        `'${expr.name}' is a type. Pick a case, e.g. '${expr.name}.someCase'.`,
+        expr.span,
+      );
+      return errorType;
+    }
     if (symbol && symbol.kind === 'model') {
       this.report(
         DiagnosticCodes.TypeMismatch,
@@ -963,7 +1119,14 @@ class Checker {
     return errorType;
   }
 
-  private checkCall(expr: CallExpression, ctx: FunctionContext): SemType {
+  private checkCall(expr: CallExpression, ctx: FunctionContext, allowsThrow = false): SemType {
+    // `EnumType.caseName(args)` constructs a case with payload.
+    if (expr.callee.kind === 'MemberAccess') {
+      const enumSymbol = this.enumSymbolFor(expr.callee.object, ctx);
+      if (enumSymbol) {
+        return this.checkEnumCaseValue(expr, enumSymbol, expr.args, ctx, expr.callee.member);
+      }
+    }
     if (expr.callee.kind !== 'Identifier') {
       this.report(
         DiagnosticCodes.TypeMismatch,
@@ -994,7 +1157,7 @@ class Checker {
     }
     if ((symbol.kind === 'function' || symbol.kind === 'native') &&
         (symbol.node.kind === 'FunctionDecl' || symbol.node.kind === 'NativeFunctionDecl')) {
-      return this.checkFunctionCall(expr, symbol, ctx);
+      return this.checkFunctionCall(expr, symbol, ctx, allowsThrow);
     }
     this.report(
       DiagnosticCodes.TypeMismatch,
@@ -1010,8 +1173,44 @@ class Checker {
     expr: CallExpression,
     symbol: DeclarationSymbol,
     ctx: FunctionContext,
+    allowsThrow = false,
   ): SemType {
     const decl = symbol.node as FunctionDecl | NativeFunctionDecl;
+
+    if (decl.throwsType && !allowsThrow) {
+      this.report(
+        DiagnosticCodes.InvalidTry,
+        'error',
+        `'${symbol.name}' can throw; mark the call with 'try ${symbol.name}(...)'.`,
+        expr.callee.span,
+      );
+    }
+    if (decl.throwsType && allowsThrow) {
+      const calleeThrows = this.typeRefTypes.get(decl.throwsType);
+      if (!ctx.throwsType) {
+        this.report(
+          DiagnosticCodes.InvalidTry,
+          'error',
+          `'try ${symbol.name}(...)' propagates the error, so the enclosing function must ` +
+            `declare 'throws ${calleeThrows ? typeToString(calleeThrows) : '...'}'. ` +
+            `Catch blocks arrive in a later milestone.`,
+          expr.span,
+        );
+      } else if (
+        calleeThrows &&
+        !typesAssignable(calleeThrows, ctx.throwsType)
+      ) {
+        this.report(
+          DiagnosticCodes.TypeMismatch,
+          'error',
+          `'${symbol.name}' throws '${typeToString(calleeThrows)}', but the enclosing function ` +
+            `throws '${typeToString(ctx.throwsType)}'. Error conversion is a later milestone; ` +
+            `align the error types for now.`,
+          expr.span,
+        );
+      }
+    }
+
     const params = decl.params;
     const provided = new Map<string, Argument>();
     let sawNamed = false;
@@ -1216,6 +1415,32 @@ class Checker {
       left.kind === 'primitive' && right.kind === 'primitive';
 
     switch (expr.operator) {
+      case '??': {
+        if (left.kind !== 'optional') {
+          this.report(
+            DiagnosticCodes.TypeMismatch,
+            'error',
+            `The left side of '??' must be optional, found '${typeToString(left)}'.`,
+            expr.left.span,
+          );
+          return errorType;
+        }
+        if (right.kind === 'optional' || right.kind === 'null') {
+          if (right.kind === 'null' || typesAssignable(right, left)) {
+            return left; // Optional fallback keeps the result optional.
+          }
+        } else if (typesAssignable(right, left.inner)) {
+          return left.inner; // Non-optional fallback unwraps the result.
+        }
+        this.report(
+          DiagnosticCodes.TypeMismatch,
+          'error',
+          `The fallback of '??' must match the unwrapped type ` +
+            `'${typeToString(left.inner)}', found '${typeToString(right)}'.`,
+          expr.right.span,
+        );
+        return errorType;
+      }
       case '+':
         if (bothStringLike) return primitiveType('String');
         if (bothPrimitive('Int')) return primitiveType('Int');
@@ -1245,6 +1470,293 @@ class Checker {
         if (bothPrimitive('Bool')) return primitiveType('Bool');
         return fail();
     }
+  }
+
+  // -- Power-pack features -------------------------------------------------------
+
+  /** Resolves an expression to an enum/error declaration when it names a type. */
+  private enumSymbolFor(expr: Expression, ctx: FunctionContext): DeclarationSymbol | undefined {
+    if (expr.kind !== 'Identifier') return undefined;
+    // A local or parameter shadows the type name.
+    for (const scope of ctx.scopes) {
+      if (scope.has(expr.name)) return undefined;
+    }
+    const symbol =
+      ctx.fileScope.module.declarations.get(expr.name) ?? ctx.fileScope.imports.get(expr.name);
+    if (symbol && (symbol.kind === 'enum' || symbol.kind === 'error')) {
+      return symbol;
+    }
+    return undefined;
+  }
+
+  /**
+   * Checks `Enum.case` / `Enum.case(args)` and records the resolution for
+   * lowering. `expr` is the MemberAccess or the enclosing Call node.
+   */
+  private checkEnumCaseValue(
+    expr: Expression,
+    symbol: DeclarationSymbol,
+    args: readonly Argument[],
+    ctx: FunctionContext,
+    memberName?: NameNode,
+  ): SemType {
+    const node = symbol.node;
+    if (node.kind !== 'EnumDecl' && node.kind !== 'ErrorDecl') return errorType;
+    const caseNameNode =
+      memberName ?? (expr.kind === 'MemberAccess' ? expr.member : undefined);
+    if (!caseNameNode) return errorType;
+
+    const enumCase = node.cases.find((c) => c.name.text === caseNameNode.text);
+    const resultType: SemType = {
+      kind: 'declared',
+      name: symbol.name,
+      module: symbol.module,
+      declarationKind: symbol.kind === 'error' ? 'error' : 'enum',
+    };
+    if (!enumCase) {
+      this.report(
+        DiagnosticCodes.UnknownSymbol,
+        'error',
+        `'${symbol.name}' has no case '${caseNameNode.text}'. ` +
+          `Cases: ${listNames(node.cases.map((c) => c.name.text))}.`,
+        caseNameNode.span,
+      );
+      for (const arg of args) this.checkExpression(arg.value, ctx);
+      return errorType;
+    }
+
+    const declScope = this.scopeForModule(symbol.module) ?? ctx.fileScope;
+    const resolvedArgs: { name: string; value: Expression }[] = [];
+    if (enumCase.params.length === 0 && args.length > 0) {
+      this.report(
+        DiagnosticCodes.WrongArgumentCount,
+        'error',
+        `Case '${caseNameNode.text}' carries no payload; write '${symbol.name}.${caseNameNode.text}' ` +
+          `without parentheses.`,
+        expr.span,
+      );
+      for (const arg of args) this.checkExpression(arg.value, ctx);
+    } else if (enumCase.params.length > 0) {
+      const provided = new Map<string, Argument>();
+      let positionalIndex = 0;
+      for (const arg of args) {
+        const param = arg.name
+          ? enumCase.params.find((p) => p.name.text === arg.name!.text)
+          : enumCase.params[positionalIndex++];
+        if (!param) {
+          this.report(
+            DiagnosticCodes.InvalidArgumentName,
+            'error',
+            arg.name
+              ? `Case '${caseNameNode.text}' has no payload field '${arg.name.text}'. ` +
+                `Fields: ${listNames(enumCase.params.map((p) => p.name.text))}.`
+              : `Case '${caseNameNode.text}' takes ${enumCase.params.length} value${
+                  enumCase.params.length === 1 ? '' : 's'
+                }, but more were provided.`,
+            arg.span,
+          );
+          this.checkExpression(arg.value, ctx);
+          continue;
+        }
+        if (provided.has(param.name.text)) {
+          this.report(
+            DiagnosticCodes.InvalidArgumentName,
+            'error',
+            `Payload field '${param.name.text}' is provided twice.`,
+            arg.span,
+          );
+          continue;
+        }
+        provided.set(param.name.text, arg);
+      }
+      const missing = enumCase.params.filter((p) => !provided.has(p.name.text));
+      if (missing.length > 0) {
+        this.report(
+          DiagnosticCodes.WrongArgumentCount,
+          'error',
+          `Case '${caseNameNode.text}' is missing payload value${missing.length === 1 ? '' : 's'} ` +
+            `${listNames(missing.map((p) => p.name.text))}.`,
+          expr.span,
+        );
+      }
+      for (const param of enumCase.params) {
+        const arg = provided.get(param.name.text);
+        if (!arg) continue;
+        const argType = this.checkExpression(arg.value, ctx);
+        const paramType =
+          this.typeRefTypes.get(param.type) ?? this.resolveTypeRef(param.type, declScope, false);
+        this.requireAssignable(argType, paramType, arg.value.span, `Payload '${param.name.text}'`);
+        resolvedArgs.push({ name: param.name.text, value: arg.value });
+      }
+    }
+
+    this.enumValues.set(expr, { caseName: caseNameNode.text, args: resolvedArgs });
+    return resultType;
+  }
+
+  /**
+   * Checks a match expression: scrutinee is an enum or error, every arm names
+   * a real case with the right number of bindings, arm results unify, and
+   * coverage is exhaustive (Constitution Document 4 §21).
+   */
+  private checkMatch(expr: MatchExpression, ctx: FunctionContext): SemType {
+    const scrutineeType = this.checkExpression(expr.scrutinee, ctx);
+    if (scrutineeType.kind === 'error') {
+      for (const arm of expr.arms) this.checkExpression(arm.body, ctx);
+      if (expr.elseArm) this.checkExpression(expr.elseArm, ctx);
+      return errorType;
+    }
+    if (
+      scrutineeType.kind !== 'declared' ||
+      (scrutineeType.declarationKind !== 'enum' && scrutineeType.declarationKind !== 'error')
+    ) {
+      this.report(
+        DiagnosticCodes.InvalidMatch,
+        'error',
+        `match inspects enum or error values, but this has type ` +
+          `'${typeToString(scrutineeType)}'.`,
+        expr.scrutinee.span,
+      );
+      for (const arm of expr.arms) this.checkExpression(arm.body, ctx);
+      if (expr.elseArm) this.checkExpression(expr.elseArm, ctx);
+      return errorType;
+    }
+
+    const enumSymbol = this.modules.get(scrutineeType.module)?.declarations.get(scrutineeType.name);
+    const node = enumSymbol?.node;
+    if (!node || (node.kind !== 'EnumDecl' && node.kind !== 'ErrorDecl')) return errorType;
+    const declScope = this.scopeForModule(scrutineeType.module) ?? ctx.fileScope;
+
+    let resultType: SemType | undefined;
+    const covered = new Set<string>();
+
+    for (const arm of expr.arms) {
+      const enumCase = node.cases.find((c) => c.name.text === arm.caseName.text);
+      if (!enumCase) {
+        this.report(
+          DiagnosticCodes.InvalidMatch,
+          'error',
+          `'${scrutineeType.name}' has no case '${arm.caseName.text}'. ` +
+            `Cases: ${listNames(node.cases.map((c) => c.name.text))}.`,
+          arm.caseName.span,
+        );
+        this.checkExpression(arm.body, ctx);
+        continue;
+      }
+      if (covered.has(enumCase.name.text)) {
+        this.report(
+          DiagnosticCodes.InvalidMatch,
+          'error',
+          `Case '${enumCase.name.text}' is matched twice; remove the duplicate arm.`,
+          arm.caseName.span,
+        );
+      }
+      covered.add(enumCase.name.text);
+
+      const fields: { name: string; field: string; type: SemType }[] = [];
+      if (arm.bindings.length !== enumCase.params.length) {
+        this.report(
+          DiagnosticCodes.InvalidMatch,
+          'error',
+          enumCase.params.length === 0
+            ? `Case '${enumCase.name.text}' carries no payload; write it without bindings.`
+            : `Case '${enumCase.name.text}' carries ${enumCase.params.length} payload value${
+                enumCase.params.length === 1 ? '' : 's'
+              } (${listNames(enumCase.params.map((p) => p.name.text))}), but ` +
+              `${arm.bindings.length} binding${arm.bindings.length === 1 ? ' was' : 's were'} written.`,
+          arm.span,
+        );
+      }
+      const armScope = new Map<string, { type: SemType; kind: 'local' | 'param' }>();
+      arm.bindings.forEach((binding, index) => {
+        const param = enumCase.params[index];
+        const bindingType = param
+          ? this.typeRefTypes.get(param.type) ?? this.resolveTypeRef(param.type, declScope, false)
+          : errorType;
+        armScope.set(binding.text, { type: bindingType, kind: 'local' });
+        if (param) {
+          fields.push({ name: binding.text, field: param.name.text, type: bindingType });
+        }
+      });
+      this.matchArmFields.set(arm, fields);
+
+      ctx.scopes.push(armScope);
+      const bodyType = this.checkExpression(arm.body, ctx);
+      ctx.scopes.pop();
+
+      if (!resultType || resultType.kind === 'error') {
+        resultType = bodyType;
+      } else if (!typesAssignable(bodyType, resultType)) {
+        this.report(
+          DiagnosticCodes.TypeMismatch,
+          'error',
+          `Match arms must produce the same type: this arm produces ` +
+            `'${typeToString(bodyType)}', but earlier arms produce '${typeToString(resultType)}'.`,
+          arm.body.span,
+        );
+      }
+    }
+
+    if (expr.elseArm) {
+      const elseType = this.checkExpression(expr.elseArm, ctx);
+      if (!resultType || resultType.kind === 'error') {
+        resultType = elseType;
+      } else if (!typesAssignable(elseType, resultType)) {
+        this.report(
+          DiagnosticCodes.TypeMismatch,
+          'error',
+          `Match arms must produce the same type: the else arm produces ` +
+            `'${typeToString(elseType)}', but earlier arms produce '${typeToString(resultType)}'.`,
+          expr.elseArm.span,
+        );
+      }
+    } else {
+      const missing = node.cases.filter((c) => !covered.has(c.name.text));
+      if (missing.length > 0) {
+        this.report(
+          DiagnosticCodes.NonExhaustiveMatch,
+          'error',
+          `This match does not cover ${listNames(missing.map((c) => c.name.text))}. ` +
+            `Add the missing arm${missing.length === 1 ? '' : 's'} or an 'else ->' arm.`,
+          expr.span,
+        );
+      }
+    }
+
+    const finalType = resultType ?? errorType;
+    this.expressionTypes.set(expr, finalType);
+    return finalType;
+  }
+
+  /** Checks `try f(...)`: the call throws, and the enclosing function can propagate. */
+  private checkTry(expr: Expression & { kind: 'Try' }, ctx: FunctionContext): SemType {
+    if (expr.expression.kind !== 'Call') {
+      this.report(
+        DiagnosticCodes.InvalidTry,
+        'error',
+        `'try' marks a call into a throwing function, e.g. 'try fetchUser(id: id)'.`,
+        expr.span,
+      );
+      return this.checkExpression(expr.expression, ctx);
+    }
+    const resultType = this.checkCall(expr.expression, ctx, true);
+    this.expressionTypes.set(expr.expression, resultType);
+
+    const resolution = this.callResolutions.get(expr.expression);
+    const decl = resolution?.target.node;
+    if (
+      decl &&
+      (decl.kind === 'FunctionDecl' || decl.kind === 'NativeFunctionDecl') &&
+      !decl.throwsType
+    ) {
+      this.report(
+        DiagnosticCodes.InvalidTry,
+        'warning',
+        `'${resolution!.target.name}' cannot throw; the 'try' here does nothing.`,
+        expr.span,
+      );
+    }
+    return resultType;
   }
 
   // -- Helpers ----------------------------------------------------------------
@@ -1368,4 +1880,11 @@ function renderTypeRef(ref: TypeRef): string {
 
 function listNames(names: readonly string[]): string {
   return names.map((n) => `'${n}'`).join(', ');
+}
+
+/** A friendly binding-name suggestion for if-let hints. */
+function describeUnwrapName(expr: Expression): string {
+  if (expr.kind === 'Identifier') return expr.name;
+  if (expr.kind === 'MemberAccess') return expr.member.text;
+  return 'value';
 }

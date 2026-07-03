@@ -13,6 +13,10 @@ export type TokenKind =
   | 'StringLiteral'
   | 'IntLiteral'
   | 'FloatLiteral'
+  // Interpolated string pieces: `"text\(` … `)text\(` … `)text"`.
+  | 'StringInterpolationHead'
+  | 'StringInterpolationMiddle'
+  | 'StringInterpolationTail'
   // Punctuation and operators.
   | 'LeftBrace'
   | 'RightBrace'
@@ -31,6 +35,8 @@ export type TokenKind =
   | 'Comma'
   | 'Dot'
   | 'Question'
+  | 'QuestionDot' // ?.
+  | 'QuestionQuestion' // ??
   | 'Equals'
   | 'Arrow' // ->
   | 'Plus'
@@ -71,6 +77,8 @@ export type TokenKind =
   | 'KwIn'
   | 'KwWhile'
   | 'KwReturn'
+  | 'KwMatch'
+  | 'KwThrow'
   | 'KwThrows'
   | 'KwTry'
   | 'KwCatch'
@@ -116,6 +124,8 @@ export const keywordKinds: Readonly<Record<string, TokenKind>> = {
   in: 'KwIn',
   while: 'KwWhile',
   return: 'KwReturn',
+  match: 'KwMatch',
+  throw: 'KwThrow',
   throws: 'KwThrows',
   try: 'KwTry',
   catch: 'KwCatch',

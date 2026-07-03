@@ -91,6 +91,7 @@ export interface IrSetType {
 
 export type IrExpression =
   | IrStringLiteral
+  | IrInterpolatedString
   | IrIntLiteral
   | IrFloatLiteral
   | IrBoolLiteral
@@ -100,12 +101,22 @@ export type IrExpression =
   | IrFieldAccess
   | IrCall
   | IrConstruct
+  | IrEnumValue
+  | IrMatch
+  | IrTry
   | IrBinary
   | IrUnary;
 
 export interface IrStringLiteral {
   readonly kind: 'stringLiteral';
   readonly value: string;
+  readonly type: IrType;
+}
+
+/** `"Hello, \(name)!"` — text and expression parts in source order. */
+export interface IrInterpolatedString {
+  readonly kind: 'interpolatedString';
+  readonly parts: readonly ({ readonly kind: 'text'; readonly value: string } | IrExpression)[];
   readonly type: IrType;
 }
 
@@ -147,11 +158,12 @@ export interface IrParamRef {
   readonly type: IrType;
 }
 
-/** `object.field` where `object` is a model value. */
+/** `object.field` (or `object?.field` when `optionalChaining` is set). */
 export interface IrFieldAccess {
   readonly kind: 'fieldAccess';
   readonly object: IrExpression;
   readonly field: string;
+  readonly optionalChaining: boolean;
   readonly type: IrType;
 }
 
@@ -177,6 +189,47 @@ export interface IrConstruct {
   readonly type: IrType;
 }
 
+/**
+ * An enum or error case value: `OrderStatus.pending` or
+ * `NetworkError.server(message: "down")`. Args are named per payload field
+ * and empty for simple cases.
+ */
+export interface IrEnumValue {
+  readonly kind: 'enumValue';
+  readonly enumType: IrDeclaredType;
+  readonly caseName: string;
+  readonly args: readonly IrArgument[];
+  readonly type: IrType;
+}
+
+/** One arm of a match: bound payload fields plus the result expression. */
+export interface IrMatchArm {
+  readonly caseName: string;
+  /** Binding name per payload field, in declaration order. */
+  readonly bindings: readonly { readonly name: string; readonly field: string; readonly type: IrType }[];
+  readonly body: IrExpression;
+}
+
+/**
+ * `match value { ... }` over an enum or error. Exhaustiveness was proven by
+ * the checker: either every case appears or `elseBody` is present.
+ */
+export interface IrMatch {
+  readonly kind: 'match';
+  readonly scrutinee: IrExpression;
+  readonly enumType: IrDeclaredType;
+  readonly arms: readonly IrMatchArm[];
+  readonly elseBody?: IrExpression;
+  readonly type: IrType;
+}
+
+/** `try f(...)` — the wrapped call may throw; targets render their marker. */
+export interface IrTry {
+  readonly kind: 'try';
+  readonly expression: IrExpression;
+  readonly type: IrType;
+}
+
 export type IrBinaryOperator =
   | '+'
   | '-'
@@ -190,7 +243,8 @@ export type IrBinaryOperator =
   | '>'
   | '>='
   | '&&'
-  | '||';
+  | '||'
+  | '??';
 
 export interface IrBinary {
   readonly kind: 'binary';
@@ -211,7 +265,7 @@ export interface IrUnary {
 // Statements
 // ---------------------------------------------------------------------------
 
-export type IrStatement = IrLet | IrReturn | IrIf | IrExpressionStatement;
+export type IrStatement = IrLet | IrReturn | IrIf | IrIfLet | IrThrow | IrExpressionStatement;
 
 export interface IrLet {
   readonly kind: 'let';
@@ -231,6 +285,22 @@ export interface IrIf {
   readonly condition: IrExpression;
   readonly then: readonly IrStatement[];
   readonly else?: readonly IrStatement[];
+}
+
+/** `if let name = value { ... } else { ... }`; `type` is the unwrapped type. */
+export interface IrIfLet {
+  readonly kind: 'ifLet';
+  readonly name: string;
+  readonly type: IrType;
+  readonly value: IrExpression;
+  readonly then: readonly IrStatement[];
+  readonly else?: readonly IrStatement[];
+}
+
+/** `throw value` — value's type equals the enclosing function's throws type. */
+export interface IrThrow {
+  readonly kind: 'throw';
+  readonly value: IrExpression;
 }
 
 export interface IrExpressionStatement {

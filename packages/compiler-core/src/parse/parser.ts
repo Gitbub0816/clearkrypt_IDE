@@ -3,7 +3,7 @@ import { DiagnosticCodes } from '../diagnostics/codes';
 import { LineMap, SourceFileInput } from '../text/sourceFile';
 import { Span, unionSpan } from '../text/span';
 import { Token, TokenKind } from '../syntax/tokens';
-import { decodeStringLiteral, lex } from '../lex/lexer';
+import { decodeInterpolationSegment, decodeStringLiteral, lex } from '../lex/lexer';
 import {
   Argument,
   BinaryOperator,
@@ -17,9 +17,13 @@ import {
   Expression,
   FieldDecl,
   FunctionDecl,
+  IfLetStatement,
   IfStatement,
   ImportDecl,
+  InterpolatedStringExpression,
   LetStatement,
+  MatchArm,
+  MatchExpression,
   ModelDecl,
   ModuleDecl,
   NameNode,
@@ -35,6 +39,8 @@ import {
   SourceFileNode,
   Statement,
   StringLiteral,
+  StringTextPart,
+  ThrowStatement,
   TypeRef,
   UiElement,
   UnaryOperator,
@@ -87,7 +93,6 @@ const RESERVED_FUTURE_KINDS = new Set<TokenKind>([
   'KwEffect',
   'KwFor',
   'KwWhile',
-  'KwTry',
   'KwCatch',
   'KwPublic',
   'KwPrivate',
@@ -665,14 +670,22 @@ class Parser {
   }
 
   private startsStatement(kind: TokenKind): boolean {
-    return kind === 'KwLet' || kind === 'KwVar' || kind === 'KwReturn' || kind === 'KwIf' || this.startsExpression(kind);
+    return (
+      kind === 'KwLet' ||
+      kind === 'KwVar' ||
+      kind === 'KwReturn' ||
+      kind === 'KwIf' ||
+      kind === 'KwThrow' ||
+      this.startsExpression(kind)
+    );
   }
 
   private parseStatement(): Statement {
     const kind = this.current().kind;
     if (kind === 'KwLet' || kind === 'KwVar') return this.parseLetStatement();
     if (kind === 'KwReturn') return this.parseReturnStatement();
-    if (kind === 'KwIf') return this.parseIfStatement();
+    if (kind === 'KwIf') return this.parseIfLike();
+    if (kind === 'KwThrow') return this.parseThrowStatement();
     const expression = this.parseExpression();
     return { kind: 'ExpressionStatement', expression, span: expression.span };
   }
@@ -717,19 +730,54 @@ class Parser {
     return { kind: 'ReturnStatement', value, span: value ? unionSpan(kw.span, value.span) : kw.span };
   }
 
-  // IfStatement := 'if' Expression Block ('else' (IfStatement | Block))?
-  private parseIfStatement(): IfStatement {
+  // IfStatement   := 'if' Expression Block ('else' (IfLike | Block))?
+  // IfLetStatement := 'if' 'let' Identifier '=' Expression Block ('else' ...)?
+  private parseIfLike(): IfStatement | IfLetStatement {
     const kw = this.advance();
+    if (this.current().kind === 'KwLet') {
+      this.advance();
+      const nameTok = this.expectIdentifier('a binding name after if let');
+      this.expect(
+        'Equals',
+        `Expected '=' followed by an optional value to unwrap into '${nameTok.text}'.`,
+      );
+      const value = this.parseExpression();
+      const thenBlock = this.parseBlock();
+      const elseBlock = this.parseElseClause();
+      return {
+        kind: 'IfLetStatement',
+        name: this.nameNode(nameTok),
+        value,
+        thenBlock,
+        elseBlock,
+        span: unionSpan(kw.span, elseBlock?.span ?? thenBlock.span),
+      };
+    }
     const condition = this.parseExpression();
     const thenBlock = this.parseBlock();
-    let elseBlock: Block | IfStatement | undefined;
-    let endSpan = thenBlock.span;
-    if (this.current().kind === 'KwElse') {
-      this.advance();
-      elseBlock = this.current().kind === 'KwIf' ? this.parseIfStatement() : this.parseBlock();
-      endSpan = elseBlock.span;
+    const elseBlock = this.parseElseClause();
+    return {
+      kind: 'IfStatement',
+      condition,
+      thenBlock,
+      elseBlock,
+      span: unionSpan(kw.span, elseBlock?.span ?? thenBlock.span),
+    };
+  }
+
+  private parseElseClause(): Block | IfStatement | IfLetStatement | undefined {
+    if (this.current().kind !== 'KwElse') {
+      return undefined;
     }
-    return { kind: 'IfStatement', condition, thenBlock, elseBlock, span: unionSpan(kw.span, endSpan) };
+    this.advance();
+    return this.current().kind === 'KwIf' ? this.parseIfLike() : this.parseBlock();
+  }
+
+  // ThrowStatement := 'throw' Expression
+  private parseThrowStatement(): ThrowStatement {
+    const kw = this.advance();
+    const value = this.parseExpression();
+    return { kind: 'ThrowStatement', value, span: unionSpan(kw.span, value.span) };
   }
 
   // -------------------------------------------------------------------------
@@ -739,11 +787,14 @@ class Parser {
   private startsExpression(kind: TokenKind): boolean {
     switch (kind) {
       case 'StringLiteral':
+      case 'StringInterpolationHead':
       case 'IntLiteral':
       case 'FloatLiteral':
       case 'KwTrue':
       case 'KwFalse':
       case 'KwNull':
+      case 'KwMatch':
+      case 'KwTry':
       case 'Identifier':
       case 'LeftParen':
       case 'Minus':
@@ -791,13 +842,28 @@ class Parser {
   }
 
   private parseRelational(): Expression {
-    let left = this.parseAdditive();
+    let left = this.parseCoalesce();
     for (;;) {
       const operator = relationalOperatorFor(this.current().kind);
       if (!operator) break;
       this.advance();
-      const right = this.parseAdditive();
+      const right = this.parseCoalesce();
       left = { kind: 'Binary', operator, left, right, span: unionSpan(left.span, right.span) };
+    }
+    return left;
+  }
+
+  /**
+   * `??` binds tighter than comparisons and looser than arithmetic (matching
+   * Swift, so the same expression reads identically in generated output),
+   * and is right-associative: `a ?? b ?? c` is `a ?? (b ?? c)`.
+   */
+  private parseCoalesce(): Expression {
+    const left = this.parseAdditive();
+    if (this.current().kind === 'QuestionQuestion') {
+      this.advance();
+      const right = this.parseCoalesce();
+      return { kind: 'Binary', operator: '??', left, right, span: unionSpan(left.span, right.span) };
     }
     return left;
   }
@@ -828,6 +894,11 @@ class Parser {
 
   private parseUnary(): Expression {
     const kind = this.current().kind;
+    if (kind === 'KwTry') {
+      const kw = this.advance();
+      const expression = this.parseUnary();
+      return { kind: 'Try', expression, span: unionSpan(kw.span, expression.span) };
+    }
     const operator: UnaryOperator | undefined = kind === 'Minus' ? '-' : kind === 'Bang' ? '!' : undefined;
     if (operator) {
       const opTok = this.advance();
@@ -840,13 +911,16 @@ class Parser {
   private parsePostfix(): Expression {
     let expr = this.parsePrimary();
     for (;;) {
-      if (this.current().kind === 'Dot') {
-        this.advance();
-        const memberTok = this.expectIdentifier('a member name after .');
+      if (this.current().kind === 'Dot' || this.current().kind === 'QuestionDot') {
+        const optionalChaining = this.advance().kind === 'QuestionDot';
+        const memberTok = this.expectIdentifier(
+          optionalChaining ? 'a member name after ?.' : 'a member name after .',
+        );
         expr = {
           kind: 'MemberAccess',
           object: expr,
           member: this.nameNode(memberTok),
+          optionalChaining,
           span: unionSpan(expr.span, memberTok.span),
         };
         continue;
@@ -872,6 +946,10 @@ class Parser {
       case 'StringLiteral':
         this.advance();
         return { kind: 'StringLiteral', value: decodeStringLiteral(tok.text), span: tok.span };
+      case 'StringInterpolationHead':
+        return this.parseInterpolatedString();
+      case 'KwMatch':
+        return this.parseMatchExpression();
       case 'IntLiteral':
         this.advance();
         return { kind: 'IntLiteral', text: tok.text, span: tok.span };
@@ -908,6 +986,106 @@ class Parser {
         // leaving this token in place cannot stall the parser.
         return { kind: 'NullLiteral', span: tok.span };
     }
+  }
+
+  // InterpolatedString := Head Expression (Middle Expression)* Tail
+  private parseInterpolatedString(): InterpolatedStringExpression {
+    const head = this.advance();
+    const parts: (StringTextPart | Expression)[] = [
+      { kind: 'StringTextPart', value: decodeInterpolationSegment(head.text), span: head.span },
+    ];
+    let endSpan = head.span;
+    for (;;) {
+      parts.push(this.parseExpression());
+      const segment = this.current();
+      if (segment.kind === 'StringInterpolationMiddle' || segment.kind === 'StringInterpolationTail') {
+        this.advance();
+        parts.push({
+          kind: 'StringTextPart',
+          value: decodeInterpolationSegment(segment.text),
+          span: segment.span,
+        });
+        endSpan = segment.span;
+        if (segment.kind === 'StringInterpolationTail') {
+          break;
+        }
+        continue;
+      }
+      this.addDiagnostic(
+        DiagnosticCodes.UnexpectedToken,
+        `Expected ')' to continue this interpolated string, but found ${describeToken(segment)}.`,
+        segment.span,
+      );
+      break;
+    }
+    return { kind: 'InterpolatedString', parts, span: unionSpan(head.span, endSpan) };
+  }
+
+  /**
+   * MatchExpression := 'match' Expression '{' MatchArm* '}'
+   * MatchArm := (Identifier ('(' Identifier (',' Identifier)* ')')? | 'else') '->' Expression
+   */
+  private parseMatchExpression(): MatchExpression {
+    const kw = this.advance();
+    const scrutinee = this.parseExpression();
+    this.expect('LeftBrace', `Expected '{' to open the match arms, but found ${describeToken(this.current())}.`);
+    const arms: MatchArm[] = [];
+    let elseArm: Expression | undefined;
+    while (this.current().kind !== 'RightBrace' && this.current().kind !== 'EndOfFile') {
+      if (this.current().kind === 'KwElse') {
+        const elseTok = this.advance();
+        this.expect('Arrow', `Expected '->' after 'else' in this match.`);
+        const body = this.parseExpression();
+        if (elseArm) {
+          this.addDiagnostic(
+            DiagnosticCodes.InvalidMatch,
+            `This match already has an 'else' arm; remove the duplicate.`,
+            elseTok.span,
+          );
+        } else {
+          elseArm = body;
+        }
+        continue;
+      }
+      if (this.current().kind !== 'Identifier') {
+        this.addDiagnostic(
+          DiagnosticCodes.UnexpectedToken,
+          `Expected a case name or 'else' in this match, but found ${describeToken(this.current())}.`,
+          this.current().span,
+        );
+        this.advance(); // Guarantee progress, then resync on the next arm.
+        continue;
+      }
+      const caseTok = this.advance();
+      const bindings: NameNode[] = [];
+      if (this.current().kind === 'LeftParen') {
+        this.advance();
+        while (this.current().kind !== 'RightParen' && this.current().kind !== 'EndOfFile') {
+          const bindingTok = this.expectIdentifier('a binding name for the case payload');
+          bindings.push(this.nameNode(bindingTok));
+          if (this.current().kind === 'Comma') {
+            this.advance();
+          } else {
+            break;
+          }
+        }
+        this.expect('RightParen', `Expected ')' to close the case bindings.`);
+      }
+      this.expect('Arrow', `Expected '->' after case '${caseTok.text}' in this match.`);
+      const body = this.parseExpression();
+      arms.push({
+        kind: 'MatchArm',
+        caseName: this.nameNode(caseTok),
+        bindings,
+        body,
+        span: unionSpan(caseTok.span, body.span),
+      });
+    }
+    const close = this.expect(
+      'RightBrace',
+      `Expected '}' to close the match, but found ${describeToken(this.current())}.`,
+    );
+    return { kind: 'Match', scrutinee, arms, elseArm, span: unionSpan(kw.span, close.span) };
   }
 
   // Args := (Argument (',' Argument)*)? ; Argument := (Identifier ':')? Expression

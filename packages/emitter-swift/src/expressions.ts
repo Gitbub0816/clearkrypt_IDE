@@ -26,11 +26,12 @@ export function escapeStringLiteral(value: string): string {
 // groups closely enough for our operator set (arithmetic, comparison,
 // logical) that no observable-behavior difference exists.
 const BINARY_PRECEDENCE: Record<IrBinaryOperator, number> = {
-  '*': 5,
-  '/': 5,
-  '%': 5,
-  '+': 4,
-  '-': 4,
+  '*': 6,
+  '/': 6,
+  '%': 6,
+  '+': 5,
+  '-': 5,
+  '??': 4,
   '<': 3,
   '<=': 3,
   '>': 3,
@@ -43,7 +44,7 @@ const BINARY_PRECEDENCE: Record<IrBinaryOperator, number> = {
 
 // Operators for which `a op (b op c)` is equivalent to `a op b op c` and so
 // the parentheses around a same-operator right operand can be dropped.
-const ASSOCIATIVE_OPERATORS = new Set<IrBinaryOperator>(['+', '*', '&&', '||']);
+const ASSOCIATIVE_OPERATORS = new Set<IrBinaryOperator>(['+', '*', '&&', '||', '??']);
 
 const UNARY_PRECEDENCE = 6;
 const ATOMIC_PRECEDENCE = 100;
@@ -103,8 +104,33 @@ export function renderExpr(expr: IrExpression, origin: IrOrigin, diagnostics: Di
       return swiftIdentifier(expr.name);
     case 'paramRef':
       return swiftIdentifier(expr.name);
-    case 'fieldAccess':
-      return `${renderChild(expr.object, origin, diagnostics, ATOMIC_PRECEDENCE, undefined, false)}.${swiftIdentifier(expr.field)}`;
+    case 'fieldAccess': {
+      const objectText = renderChild(expr.object, origin, diagnostics, ATOMIC_PRECEDENCE, undefined, false);
+      return `${objectText}${expr.optionalChaining ? '?.' : '.'}${swiftIdentifier(expr.field)}`;
+    }
+    case 'interpolatedString': {
+      const parts = expr.parts
+        .map((part) =>
+          part.kind === 'text'
+            ? escapeStringLiteral(part.value)
+            : '\\(' + renderExpr(part, origin, diagnostics) + ')',
+        )
+        .join('');
+      return `"${parts}"`;
+    }
+    case 'enumValue': {
+      const caseRef = `${expr.enumType.name}.${swiftIdentifier(expr.caseName)}`;
+      return expr.args.length > 0 ? `${caseRef}(${renderArgs(expr.args, origin, diagnostics)})` : caseRef;
+    }
+    case 'try':
+      return `try ${renderExpr(expr.expression, origin, diagnostics)}`;
+    case 'match':
+      // The checker restricts match to let-initializers and return values,
+      // which renderStatement handles as multi-line switch expressions.
+      diagnostics.push(
+        unsupportedFeature(origin, `A match expression reached an unsupported position`),
+      );
+      return '/* unsupported match position */';
     case 'call':
       return `${expr.function.name}(${renderArgs(expr.args, origin, diagnostics)})`;
     case 'construct':
@@ -156,17 +182,38 @@ function renderStatement(
   switch (statement.kind) {
     case 'let': {
       const keyword = statement.mutable ? 'var' : 'let';
-      const value = renderExpr(statement.value, origin, diagnostics);
-      return [`${pad}${keyword} ${swiftIdentifier(statement.name)} = ${value}`];
+      const head = `${pad}${keyword} ${swiftIdentifier(statement.name)} = `;
+      if (statement.value.kind === 'match') {
+        return renderMatch(statement.value, head, origin, diagnostics, level);
+      }
+      return [`${head}${renderExpr(statement.value, origin, diagnostics)}`];
     }
     case 'return': {
       if (statement.value === undefined) {
         return [`${pad}return`];
       }
+      if (statement.value.kind === 'match') {
+        return renderMatch(statement.value, `${pad}return `, origin, diagnostics, level);
+      }
       return [`${pad}return ${renderExpr(statement.value, origin, diagnostics)}`];
     }
     case 'if':
       return renderIf(statement, origin, diagnostics, level);
+    case 'ifLet': {
+      const value = renderExpr(statement.value, origin, diagnostics);
+      const lines = [
+        `${pad}if let ${swiftIdentifier(statement.name)} = ${value} {`,
+        ...renderStatements(statement.then, origin, diagnostics, level + 1),
+      ];
+      if (statement.else !== undefined) {
+        lines.push(`${pad}} else {`);
+        lines.push(...renderStatements(statement.else, origin, diagnostics, level + 1));
+      }
+      lines.push(`${pad}}`);
+      return lines;
+    }
+    case 'throw':
+      return [`${pad}throw ${renderExpr(statement.value, origin, diagnostics)}`];
     case 'expr':
       return [`${pad}${renderExpr(statement.expression, origin, diagnostics)}`];
     default: {
@@ -189,5 +236,36 @@ function renderIf(statement: IrIf, origin: IrOrigin, diagnostics: Diagnostic[], 
   } else {
     lines.push(`${pad}}`);
   }
+  return lines;
+}
+
+/**
+ * Renders a match as a Swift switch expression (Swift 5.9+), attached to the
+ * given head (`let x = ` or `return `). Payload bindings use `case .name(let
+ * a, let b)`; the checker already proved exhaustiveness.
+ */
+function renderMatch(
+  match: Extract<IrExpression, { kind: 'match' }>,
+  head: string,
+  origin: IrOrigin,
+  diagnostics: Diagnostic[],
+  level: number,
+): string[] {
+  const pad = indent(level);
+  const scrutinee = renderExpr(match.scrutinee, origin, diagnostics);
+  const lines = [`${head}switch ${scrutinee} {`];
+  for (const arm of match.arms) {
+    const bindings =
+      arm.bindings.length > 0
+        ? `(${arm.bindings.map((b) => `let ${swiftIdentifier(b.name)}`).join(', ')})`
+        : '';
+    lines.push(`${pad}case .${swiftIdentifier(arm.caseName)}${bindings}:`);
+    lines.push(`${indent(level + 1)}${renderExpr(arm.body, origin, diagnostics)}`);
+  }
+  if (match.elseBody !== undefined) {
+    lines.push(`${pad}default:`);
+    lines.push(`${indent(level + 1)}${renderExpr(match.elseBody, origin, diagnostics)}`);
+  }
+  lines.push(`${pad}}`);
   return lines;
 }

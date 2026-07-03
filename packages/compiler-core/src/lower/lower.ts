@@ -19,6 +19,8 @@ import {
   Expression,
   FieldDecl,
   FunctionDecl,
+  IfStatement,
+  MatchExpression,
   NativeTarget,
   ParamDecl,
   SourceFileNode,
@@ -248,15 +250,34 @@ class Lowerer {
           kind: 'if',
           condition: this.lowerExpression(statement.condition),
           then: statement.thenBlock.statements.map((s) => this.lowerStatement(s)),
-          else: statement.elseBlock
-            ? statement.elseBlock.kind === 'IfStatement'
-              ? [this.lowerStatement(statement.elseBlock)]
-              : statement.elseBlock.statements.map((s) => this.lowerStatement(s))
-            : undefined,
+          else: this.lowerElseBranch(statement.elseBlock),
         };
+      case 'IfLetStatement': {
+        const valueType = this.typeOf(statement.value);
+        return {
+          kind: 'ifLet',
+          name: statement.name.text,
+          type: valueType.kind === 'optional' ? valueType.inner : valueType,
+          value: this.lowerExpression(statement.value),
+          then: statement.thenBlock.statements.map((s) => this.lowerStatement(s)),
+          else: this.lowerElseBranch(statement.elseBlock),
+        };
+      }
+      case 'ThrowStatement':
+        return { kind: 'throw', value: this.lowerExpression(statement.value) };
       case 'ExpressionStatement':
         return { kind: 'expr', expression: this.lowerExpression(statement.expression) };
     }
+  }
+
+  private lowerElseBranch(
+    elseBlock: IfStatement['elseBlock'],
+  ): IrStatement[] | undefined {
+    if (!elseBlock) return undefined;
+    if (elseBlock.kind === 'IfStatement' || elseBlock.kind === 'IfLetStatement') {
+      return [this.lowerStatement(elseBlock)];
+    }
+    return elseBlock.statements.map((s) => this.lowerStatement(s));
   }
 
   private lowerExpression(expr: Expression): IrExpression {
@@ -278,14 +299,38 @@ class Lowerer {
           ? { kind: 'paramRef', name: expr.name, type }
           : { kind: 'localRef', name: expr.name, type };
       }
-      case 'MemberAccess':
+      case 'MemberAccess': {
+        const enumValue = this.checked.enumValues.get(expr);
+        if (enumValue) {
+          return this.lowerEnumValue(expr, enumValue, type);
+        }
         return {
           kind: 'fieldAccess',
           object: this.lowerExpression(expr.object),
           field: expr.member.text,
+          optionalChaining: expr.optionalChaining,
           type,
         };
+      }
+      case 'InterpolatedString':
+        return {
+          kind: 'interpolatedString',
+          parts: expr.parts.map((part) =>
+            part.kind === 'StringTextPart'
+              ? { kind: 'text' as const, value: part.value }
+              : this.lowerExpression(part),
+          ),
+          type,
+        };
+      case 'Match':
+        return this.lowerMatch(expr, type);
+      case 'Try':
+        return { kind: 'try', expression: this.lowerExpression(expr.expression), type };
       case 'Call': {
+        const enumValue = this.checked.enumValues.get(expr);
+        if (enumValue) {
+          return this.lowerEnumValue(expr, enumValue, type);
+        }
         const resolution = this.checked.callResolutions.get(expr);
         if (!resolution) {
           // Unresolvable calls only exist in projects with errors, which are
@@ -327,6 +372,49 @@ class Lowerer {
           type,
         };
     }
+  }
+
+  private lowerEnumValue(
+    expr: Expression,
+    enumValue: { readonly caseName: string; readonly args: readonly { name: string; value: Expression }[] },
+    type: IrType,
+  ): IrExpression {
+    if (type.kind !== 'declared') {
+      throw new Error('internal error: enum value without a declared type reached lowering');
+    }
+    return {
+      kind: 'enumValue',
+      enumType: type,
+      caseName: enumValue.caseName,
+      args: enumValue.args.map((a) => ({ name: a.name, value: this.lowerExpression(a.value) })),
+      type,
+    };
+  }
+
+  private lowerMatch(expr: MatchExpression, type: IrType): IrExpression {
+    const scrutineeType = this.typeOf(expr.scrutinee);
+    if (scrutineeType.kind !== 'declared') {
+      throw new Error('internal error: match over a non-declared type reached lowering');
+    }
+    return {
+      kind: 'match',
+      scrutinee: this.lowerExpression(expr.scrutinee),
+      enumType: scrutineeType,
+      arms: expr.arms.map((arm) => {
+        const fields = this.checked.matchArmFields.get(arm) ?? [];
+        return {
+          caseName: arm.caseName.text,
+          bindings: fields.map((f) => ({
+            name: f.name,
+            field: f.field,
+            type: semToIrType(f.type),
+          })),
+          body: this.lowerExpression(arm.body),
+        };
+      }),
+      elseBody: expr.elseArm ? this.lowerExpression(expr.elseArm) : undefined,
+      type,
+    };
   }
 
   private typeOf(expr: Expression): IrType {

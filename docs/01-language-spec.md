@@ -275,6 +275,92 @@ Rules:
 - Interop cannot be used in shared code unless every requested target has an implementation or a fallback.
 - The IDE must visibly mark target-specific code.
 
+## String interpolation
+
+Strings interpolate expressions with `\(...)`:
+
+```ck
+fn describe(order: Order) -> String {
+  return "Order \(order.label): \(order.note ?? "no note")"
+}
+```
+
+Only primitive values interpolate; interpolate a specific field of a model
+rather than the model itself. Targets: Swift interpolation, Kotlin `${}`
+templates, TypeScript template literals.
+
+## Enum case values
+
+Cases are constructed from the type name:
+
+```ck
+let status = OrderStatus.pending
+throw OrderError.rejected(reason: "missing label")
+```
+
+Payload values use named arguments matching the case's declared fields.
+
+## Match expressions
+
+`match` inspects an enum or error value with compiler-checked
+exhaustiveness — every case must be covered, or an `else ->` arm provided:
+
+```ck
+let label = match status {
+  pending -> "waiting"
+  shipped -> "on the way"
+  delivered -> "done"
+}
+```
+
+Payload cases bind their values positionally:
+
+```ck
+return match error {
+  notFound -> "missing"
+  rejected(reason) -> "rejected: \(reason)"
+}
+```
+
+All arms must produce the same type. A match must directly initialize a
+binding (`let x = match ...`) or be returned (`return match ...`) so every
+target emits it cleanly: Swift switch expressions, Kotlin `when`, and
+TypeScript exhaustive switch.
+
+## Working with optionals
+
+Optionals are first-class:
+
+```ck
+let note = order.note ?? "no note"        // ?? provides a fallback
+let name = order.customer?.name ?? "anon" // ?. chains through absence
+
+if let note = order.note {                 // if let unwraps into a binding
+  return lengthOf(text: note)
+} else {
+  return 0
+}
+```
+
+Plain `.` on an optional value is a compile error with a fix suggestion —
+absence is always handled explicitly.
+
+## Throwing and propagating errors
+
+Functions declared `throws <ErrorType>` may `throw` values of that error
+type; calls into them must be marked `try`, and the enclosing function must
+declare a compatible throws type (propagation only — `catch` lands with a
+later milestone):
+
+```ck
+fn checkOrder(order: Order) throws OrderError -> String {
+  if order.label == "" {
+    throw OrderError.rejected(reason: "missing label")
+  }
+  return try requireShipped(status: order.status)
+}
+```
+
 ## Package manifest
 
 A ClearKrypt project should include `clearkrypt.toml`.
@@ -305,7 +391,7 @@ dir = "generated"
 
 Initial reserved words:
 
-`module`, `import`, `model`, `enum`, `fn`, `screen`, `component`, `route`, `effect`, `capability`, `requires`, `error`, `native`, `swift`, `kotlin`, `typescript`, `react`, `let`, `var`, `if`, `else`, `for`, `in`, `while`, `return`, `throws`, `try`, `catch`, `async`, `true`, `false`, `null`, `public`, `private`, `internal`.
+`module`, `import`, `model`, `enum`, `fn`, `screen`, `component`, `route`, `effect`, `capability`, `requires`, `error`, `native`, `swift`, `kotlin`, `typescript`, `react`, `let`, `var`, `if`, `else`, `for`, `in`, `while`, `match`, `return`, `throw`, `throws`, `try`, `catch`, `async`, `true`, `false`, `null`, `public`, `private`, `internal`.
 
 ## MVP syntax acceptance
 

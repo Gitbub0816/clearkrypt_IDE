@@ -9,15 +9,40 @@ system. ClearKrypt source compiles into:
 - React/TypeScript for web applications and shared frontend suites
 
 ```ck
-module app.main
+module app.orders
 
-model Greeting {
-  id: ID
-  message: String
+enum OrderStatus {
+  pending
+  shipped
+  delivered
 }
 
-fn greetingText(greeting: Greeting) -> String {
-  return greeting.message
+error OrderError {
+  notFound
+  rejected(reason: String)
+}
+
+model Order {
+  id: ID
+  label: String
+  note: String?
+  status: OrderStatus
+}
+
+fn describe(order: Order) -> String {
+  let status = match order.status {
+    pending -> "waiting"
+    shipped -> "on the way"
+    delivered -> "done"
+  }
+  return "Order \(order.label) (\(status)): \(order.note ?? "no note")"
+}
+
+fn checkOrder(order: Order) throws OrderError -> String {
+  if order.label == "" {
+    throw OrderError.rejected(reason: "missing label")
+  }
+  return try requireShipped(status: order.status)
 }
 ```
 
@@ -31,6 +56,12 @@ clearkrypt new hello && cd hello && clearkrypt build
 - **Compiler** (`packages/compiler-core`): lexer and error-recovering parser
   with full source spans, project-wide type checker with teacherly CKxxxx
   diagnostics, semantic model, and target-neutral IR — all snapshot-tested.
+- **Language power**: string interpolation, `match` expressions with
+  compiler-proven exhaustiveness and payload binding, first-class optionals
+  (`?.`, `??`, `if let`), enum case constructors, and typed `throw`/`try`
+  propagation — each emitted idiomatically per target (Swift `switch`
+  expressions, Kotlin `when` + elvis + smart casts, TypeScript exhaustive
+  switches + narrowing). See `docs/22-power-roadmap.md` for what's next.
 - **Emitters** (`packages/emitter-*`): models, simple and associated enums,
   typed errors, and pure/async functions as idiomatic, deterministic,
   byte-stable Swift, Kotlin, and TypeScript.

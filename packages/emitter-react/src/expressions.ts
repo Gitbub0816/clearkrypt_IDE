@@ -2,14 +2,16 @@ import {
   IrArgument,
   IrBinaryOperator,
   IrConstruct,
+  IrEnumValue,
   IrExpression,
   IrIf,
+  IrMatch,
   IrOrigin,
   IrStatement,
 } from '@clearkrypt/compiler-core';
 import { addValueImport, TsCtx } from './context';
 import { unsupportedFeature } from './diagnostics';
-import { lookupModel } from './modelIndex';
+import { lookupEnum, lookupModel } from './modelIndex';
 import { tsIdentifier } from './naming';
 
 const INDENT = '  ';
@@ -24,12 +26,22 @@ export function escapeStringLiteral(value: string): string {
     .replace(/\r/g, '\\r');
 }
 
+/** Escapes literal text for a TypeScript template literal. */
+export function escapeTemplateText(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/`/g, '\\`')
+    .replace(/\$\{/g, '\\${')
+    .replace(/\r/g, '\\r');
+}
+
 const BINARY_PRECEDENCE: Record<IrBinaryOperator, number> = {
-  '*': 5,
-  '/': 5,
-  '%': 5,
-  '+': 4,
-  '-': 4,
+  '*': 6,
+  '/': 6,
+  '%': 6,
+  '+': 5,
+  '-': 5,
+  '??': 4,
   '<': 3,
   '<=': 3,
   '>': 3,
@@ -40,7 +52,7 @@ const BINARY_PRECEDENCE: Record<IrBinaryOperator, number> = {
   '||': 0,
 };
 
-const ASSOCIATIVE_OPERATORS = new Set<IrBinaryOperator>(['+', '*', '&&', '||']);
+const ASSOCIATIVE_OPERATORS = new Set<IrBinaryOperator>(['+', '*', '&&', '||', '??']);
 const UNARY_PRECEDENCE = 6;
 const ATOMIC_PRECEDENCE = 100;
 
@@ -82,6 +94,20 @@ function renderChild(
   const text = renderExpr(expr, origin, ctx);
   const childPrecedence = precedenceOf(expr);
   let needsParens = childPrecedence < parentPrecedence;
+  // TypeScript refuses `a ?? b || c` outright: ?? may not mix with && or ||
+  // without explicit parentheses.
+  const logicalOps: readonly string[] = ['&&', '||', '??'];
+  if (
+    !needsParens &&
+    expr.kind === 'binary' &&
+    parentOperator !== undefined &&
+    parentOperator !== expr.operator &&
+    logicalOps.includes(parentOperator) &&
+    logicalOps.includes(expr.operator) &&
+    (parentOperator === '??' || expr.operator === '??')
+  ) {
+    needsParens = true;
+  }
   if (!needsParens && isRightOperand && childPrecedence === parentPrecedence) {
     const sameAssociativeOperator =
       expr.kind === 'binary' &&
@@ -136,6 +162,24 @@ function renderConstruct(expr: IrConstruct, origin: IrOrigin, ctx: TsCtx): strin
   return objectBody;
 }
 
+/**
+ * Case values per docs/19: simple enums are string-literal unions, so the
+ * value is just `'pending'`; associated enums are discriminated unions, so
+ * the value is `{ kind: 'server', message: ... }`.
+ */
+function renderEnumValue(expr: IrEnumValue, origin: IrOrigin, ctx: TsCtx): string {
+  const declaration = lookupEnum(ctx.enumIndex, expr.enumType.module, expr.enumType.name);
+  const isSimple = declaration?.isSimple ?? expr.args.length === 0;
+  if (declaration?.isSimple) {
+    return `"${escapeStringLiteral(expr.caseName)}"`;
+  }
+  if (expr.args.length === 0) {
+    return `{ kind: "${escapeStringLiteral(expr.caseName)}" }`;
+  }
+  void isSimple;
+  return `{ kind: "${escapeStringLiteral(expr.caseName)}", ${renderObjectArgs(expr.args, origin, ctx)} }`;
+}
+
 export function renderExpr(expr: IrExpression, origin: IrOrigin, ctx: TsCtx): string {
   switch (expr.kind) {
     case 'stringLiteral':
@@ -152,8 +196,36 @@ export function renderExpr(expr: IrExpression, origin: IrOrigin, ctx: TsCtx): st
       return tsIdentifier(expr.name);
     case 'paramRef':
       return tsIdentifier(expr.name);
-    case 'fieldAccess':
-      return `${renderChild(expr.object, origin, ctx, ATOMIC_PRECEDENCE, undefined, false)}.${expr.field}`;
+    case 'fieldAccess': {
+      const objectText = renderChild(expr.object, origin, ctx, ATOMIC_PRECEDENCE, undefined, false);
+      if (!expr.optionalChaining) {
+        return `${objectText}.${expr.field}`;
+      }
+      // `?.` yields undefined for absent values, but ClearKrypt optionals
+      // are `T | null` (docs/19); normalize so the null policy stays exact.
+      return `(${objectText}?.${expr.field} ?? null)`;
+    }
+    case 'interpolatedString': {
+      const parts = expr.parts
+        .map((part) =>
+          part.kind === 'text'
+            ? escapeTemplateText(part.value)
+            : '${' + renderExpr(part, origin, ctx) + '}',
+        )
+        .join('');
+      return '`' + parts + '`';
+    }
+    case 'enumValue':
+      return renderEnumValue(expr, origin, ctx);
+    case 'try':
+      // TS has no call-site marker; the thrown value propagates.
+      return renderExpr(expr.expression, origin, ctx);
+    case 'match':
+      // Handled at statement level (let/return); see renderMatch*.
+      ctx.diagnostics.push(
+        unsupportedFeature(origin, `A match expression reached an unsupported position`),
+      );
+      return '/* unsupported match position */';
     case 'call':
       addValueImport(ctx, expr.function.module, expr.function.name);
       return `${expr.function.name}(${renderCallArgs(expr.args, origin, ctx)})`;
@@ -161,7 +233,14 @@ export function renderExpr(expr: IrExpression, origin: IrOrigin, ctx: TsCtx): st
       return renderConstruct(expr, origin, ctx);
     case 'binary': {
       const precedence = BINARY_PRECEDENCE[expr.operator];
-      const left = renderChild(expr.left, origin, ctx, precedence, expr.operator, false);
+      // `a?.b ?? fallback` needs no `?? null` normalization on the left:
+      // the outer ?? treats undefined and null identically.
+      const left =
+        expr.operator === '??' &&
+        expr.left.kind === 'fieldAccess' &&
+        expr.left.optionalChaining
+          ? `${renderChild(expr.left.object, origin, ctx, ATOMIC_PRECEDENCE, undefined, false)}?.${expr.left.field}`
+          : renderChild(expr.left, origin, ctx, precedence, expr.operator, false);
       const right = renderChild(expr.right, origin, ctx, precedence, expr.operator, true);
       return `${left} ${renderOperator(expr.operator)} ${right}`;
     }
@@ -200,6 +279,14 @@ function renderStatement(statement: IrStatement, origin: IrOrigin, ctx: TsCtx, l
   switch (statement.kind) {
     case 'let': {
       const keyword = statement.mutable ? 'let' : 'const';
+      if (statement.value.kind === 'match') {
+        // `const x = (() => { switch ... })();` keeps const-ness while the
+        // switch runs statement-style.
+        const lines = [`${pad}${keyword} ${tsIdentifier(statement.name)} = (() => {`];
+        lines.push(...renderMatchAsReturningSwitch(statement.value, origin, ctx, level + 1));
+        lines.push(`${pad}})();`);
+        return lines;
+      }
       const value = renderExpr(statement.value, origin, ctx);
       return [`${pad}${keyword} ${tsIdentifier(statement.name)} = ${value};`];
     }
@@ -207,10 +294,30 @@ function renderStatement(statement: IrStatement, origin: IrOrigin, ctx: TsCtx, l
       if (statement.value === undefined) {
         return [`${pad}return;`];
       }
+      if (statement.value.kind === 'match') {
+        // Return position: the switch returns directly, no wrapper needed.
+        return renderMatchAsReturningSwitch(statement.value, origin, ctx, level);
+      }
       return [`${pad}return ${renderExpr(statement.value, origin, ctx)};`];
     }
     case 'if':
       return renderIf(statement, origin, ctx, level);
+    case 'ifLet': {
+      const name = tsIdentifier(statement.name);
+      const lines = [
+        `${pad}const ${name} = ${renderExpr(statement.value, origin, ctx)};`,
+        `${pad}if (${name} !== null) {`,
+        ...renderStatements(statement.then, origin, ctx, level + 1),
+      ];
+      if (statement.else !== undefined) {
+        lines.push(`${pad}} else {`);
+        lines.push(...renderStatements(statement.else, origin, ctx, level + 1));
+      }
+      lines.push(`${pad}}`);
+      return lines;
+    }
+    case 'throw':
+      return [`${pad}throw ${renderExpr(statement.value, origin, ctx)};`];
     case 'expr':
       return [`${pad}${renderExpr(statement.expression, origin, ctx)};`];
     default: {
@@ -231,6 +338,53 @@ function renderIf(statement: IrIf, origin: IrOrigin, ctx: TsCtx, level: number):
     lines.push(`${pad}}`);
   } else {
     lines.push(`${pad}}`);
+  }
+  return lines;
+}
+
+/**
+ * Renders a match as a returning switch. Simple enums switch on the string
+ * value; associated enums switch on `.kind` with payload bindings pulled off
+ * the narrowed value. The checker proved exhaustiveness, so the trailing
+ * throw is genuinely unreachable — it exists to keep the generated function
+ * total under any tsconfig.
+ */
+function renderMatchAsReturningSwitch(
+  match: IrMatch,
+  origin: IrOrigin,
+  ctx: TsCtx,
+  level: number,
+): string[] {
+  const pad = indent(level);
+  const declaration = lookupEnum(ctx.enumIndex, match.enumType.module, match.enumType.name);
+  const isSimple = declaration?.isSimple ?? false;
+
+  const lines = [`${pad}const matched = ${renderExpr(match.scrutinee, origin, ctx)};`];
+  lines.push(`${pad}switch (${isSimple ? 'matched' : 'matched.kind'}) {`);
+  for (const arm of match.arms) {
+    const caseLabel = `case "${escapeStringLiteral(arm.caseName)}":`;
+    const body = renderExpr(arm.body, origin, ctx);
+    if (arm.bindings.length === 0) {
+      lines.push(`${indent(level + 1)}${caseLabel}`);
+      lines.push(`${indent(level + 2)}return ${body};`);
+      continue;
+    }
+    lines.push(`${indent(level + 1)}${caseLabel} {`);
+    for (const binding of arm.bindings) {
+      lines.push(
+        `${indent(level + 2)}const ${tsIdentifier(binding.name)} = matched.${binding.field};`,
+      );
+    }
+    lines.push(`${indent(level + 2)}return ${body};`);
+    lines.push(`${indent(level + 1)}}`);
+  }
+  if (match.elseBody !== undefined) {
+    lines.push(`${indent(level + 1)}default:`);
+    lines.push(`${indent(level + 2)}return ${renderExpr(match.elseBody, origin, ctx)};`);
+  }
+  lines.push(`${pad}}`);
+  if (match.elseBody === undefined) {
+    lines.push(`${pad}throw new Error("unreachable match");`);
   }
   return lines;
 }
