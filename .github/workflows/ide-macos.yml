@@ -19,6 +19,10 @@ jobs:
         run: swift test --package-path ide/macos
         env:
           CK_REPO_ROOT: ${{ github.workspace }}
+      - name: Select the newest Xcode on the runner
+        # Current XcodeGen emits a project format newer than the image's
+        # default Xcode 15.4 can read.
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)/Contents/Developer" && xcodebuild -version
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate Xcode project
