@@ -6,3 +6,4 @@ coverage/
 obj/
 bin/
 !packages/cli/bin/
+dist-sdk/

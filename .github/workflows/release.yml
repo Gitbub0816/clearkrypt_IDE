@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+jobs:
+  sdk:
+    name: Package SDK (all platforms)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: node scripts/package-sdk.mjs
+      - name: Zip SDK
+        run: cd dist-sdk && zip -r clearkrypt-sdk.zip clearkrypt-sdk-*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: clearkrypt-sdk
+          path: dist-sdk/clearkrypt-sdk.zip
+
+  ide-windows:
+    name: Windows IDE
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet publish ide/windows/src/ClearKryptIDE -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
+      - uses: actions/upload-artifact@v4
+        with:
+          name: clearkrypt-ide-windows
+          path: publish/
+
+  ide-macos:
+    name: macOS IDE
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v5
+      - run: brew install xcodegen
+      - run: xcodegen --spec ide/macos/project.yml
+      - run: >
+          xcodebuild -project ide/macos/ClearKryptIDE.xcodeproj
+          -scheme ClearKryptIDE -configuration Release
+          -derivedDataPath ide/macos/build
+          CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build
+      - name: Zip app
+        run: |
+          cd ide/macos/build/Build/Products/Release
+          ditto -c -k --keepParent ClearKryptIDE.app clearkrypt-ide-macos.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: clearkrypt-ide-macos
+          path: ide/macos/build/Build/Products/Release/clearkrypt-ide-macos.zip

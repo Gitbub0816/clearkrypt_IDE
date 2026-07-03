@@ -1,5 +1,23 @@
 # Roadmap and Milestones
 
+## Status
+
+| Milestone | State |
+| --------- | ----- |
+| 0 Repo seed | Done |
+| 1 Monorepo skeleton | Done |
+| 2 Lexer and parser MVP | Done |
+| 3 Symbols and types | Done |
+| 4 IR | Done |
+| 5 Target emitters MVP | Done |
+| 6 CLI MVP | Done |
+| 7 UI declarations | Not started (parse/check done; lowering pending) |
+| 8 Language server | Done (diagnostics, symbols, hover, completion, semantic tokens, formatting) |
+| 9 Native IDE shells | In progress (`ide/windows` C#/Avalonia, `ide/macos` Swift/SwiftUI) |
+| 10 Interop MVP | Partially done (parse/check/CK0005 done; build inclusion pending) |
+| 11 Packaging and examples | Partially done (SDK packaging + release CI done; more examples pending) |
+| 12 IDE quality pass | Not started |
+
 ## Milestone 0: Repo seed
 
 Deliverables: README, language vision, language spec, target strategy, IDE architecture, interop strategy, agent worktree guide, and coding-agent instructions.

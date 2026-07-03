@@ -150,8 +150,9 @@ Model construction (`User(id: x, name: y)`) emits:
 ## Not yet emitted (honest limitations)
 
 Per the target honesty law, the following parse and type-check but are
-**not** emitted yet. The emitters report diagnostic `CK0004` if they appear
-in a project being emitted, rather than silently dropping them:
+**not** emitted yet. The compiler reports diagnostic `CK0004` (warning) for
+each such declaration at lowering time, rather than silently dropping them
+(missing native implementations for selected targets are `CK0005` errors):
 
 - screens and components (Roadmap Milestone 7: SwiftUI / Compose / React)
 - routes (Milestone 7)
@@ -160,6 +161,17 @@ in a project being emitted, rather than silently dropping them:
   emission is a later milestone)
 - serialization support (Codable / kotlinx.serialization / JSON schema) is
   deferred; models are plain values today
+
+## Known target limitations
+
+- **Kotlin `Data` fields**: `Data` maps to `ByteArray`, and array properties
+  do not participate in `data class` structural `equals`/`hashCode` the way
+  value collections do. This is a documented Kotlin platform behavior, not a
+  ClearKrypt bug; a value-semantics wrapper is a candidate improvement.
+- **IR expression origins**: declarations, fields, and params carry source
+  origins; individual expressions do not yet. Emitter diagnostics for
+  malformed expressions cite the enclosing declaration's span. Tightening
+  this is tracked for a later IR revision.
 
 ## Stability rules
 
