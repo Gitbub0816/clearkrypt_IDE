@@ -22,7 +22,7 @@
       "@clearkrypt/emitter-kotlin": ["packages/emitter-kotlin/src/index.ts"],
       "@clearkrypt/emitter-react": ["packages/emitter-react/src/index.ts"],
       "@clearkrypt/formatter": ["packages/formatter/src/index.ts"],
-      "@clearkrypt/cli": ["packages/cli/src/index.ts"],
+      "clearkrypt": ["packages/cli/src/index.ts"],
       "@clearkrypt/language-service": ["packages/language-service/src/index.ts"]
     }
   }

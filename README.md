@@ -67,8 +67,12 @@ clearkrypt new hello && cd hello && clearkrypt build
 - **Emitters** (`packages/emitter-*`): models, simple and associated enums,
   typed errors, and pure/async functions as idiomatic, deterministic,
   byte-stable Swift, Kotlin, and TypeScript.
-- **CLI** (`packages/cli`): `new`, `check`, `build`, `emit`, `format`, and
-  `language-server`, with human and `--json` output.
+- **CLI** (`packages/cli`, published as `clearkrypt`): `new`, `check`,
+  `build`, `emit`, `format`, and `language-server`, with human and `--json`
+  output. Bundled with esbuild at pack time into one dependency-free file,
+  so `npm install -g clearkrypt` / `npx clearkrypt` runs standalone —
+  verified by installing the packed tarball in an empty directory with no
+  workspace present.
 - **Language server** (`packages/language-service`): LSP over stdio —
   diagnostics, outline, hover, completion, semantic tokens, formatting, and
   ClearKrypt extensions (`clearkrypt/projectInfo`, `clearkrypt/check`,

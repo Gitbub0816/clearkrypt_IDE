@@ -39,9 +39,33 @@ npm test           # run all package tests (vitest)
 npm run test:watch # watch mode
 ```
 
-Tests import packages through the `@clearkrypt/*` aliases defined in
-`vitest.config.ts`, which resolve to package sources — no build step is
-needed before running tests.
+Tests import packages through the `@clearkrypt/*` (and, for the CLI,
+plain `clearkrypt`) aliases defined in `vitest.config.ts`, which resolve to
+package sources — no build step is needed before running tests.
+
+### Publishing the CLI standalone to npm
+
+`packages/cli` publishes as the bare package `clearkrypt`. Its `prepack`
+script (`packages/cli/scripts/bundle.mjs`) uses esbuild to bundle
+`dist/index.js` plus every `@clearkrypt/*` workspace package it imports
+(including the dynamically-imported `@clearkrypt/language-service`) into
+one self-contained `dist/bundle.cjs`, so `npm install -g clearkrypt` /
+`npx clearkrypt` works on a machine that has never seen this monorepo —
+there is nothing left to resolve besides Node's own built-ins. The
+sibling `@clearkrypt/*` packages are declared as `devDependencies` (build
+time only), never `dependencies`, so a consumer's install never tries to
+fetch them.
+
+To verify a change to the CLI is still standalone-publishable:
+
+```bash
+npm run build                      # tsc --build, from the repo root
+cd packages/cli
+npm pack                            # prepack runs the bundler automatically
+# install the resulting .tgz in an *empty* directory outside this repo and
+# run `clearkrypt --version` / `clearkrypt build` there — if it works with
+# zero other files present, the bundle has no missed dependency.
+```
 
 ## Testing rules
 

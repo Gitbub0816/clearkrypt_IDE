@@ -11,7 +11,7 @@ export default defineConfig({
       '@clearkrypt/emitter-kotlin': pkg('emitter-kotlin'),
       '@clearkrypt/emitter-react': pkg('emitter-react'),
       '@clearkrypt/formatter': pkg('formatter'),
-      '@clearkrypt/cli': pkg('cli'),
+      clearkrypt: pkg('cli'),
       '@clearkrypt/language-service': pkg('language-service'),
     },
   },
