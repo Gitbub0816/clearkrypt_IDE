@@ -61,3 +61,7 @@ export { printIr } from './lower/debugPrint';
 
 // Emitter contract.
 export * from './emit/contract';
+
+// Project manifest.
+export { parseManifest } from './project/manifest';
+export type { ProjectManifest, ManifestParseResult } from './project/manifest';
