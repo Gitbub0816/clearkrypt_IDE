@@ -5,6 +5,7 @@ import { normalizeWhitespace } from '@clearkrypt/formatter';
 import { loadProject } from './project';
 import { enabledTargets, runPipeline } from './pipeline';
 import { renderHuman, renderJson, renderSummary } from './output';
+import { commandExplain } from './explain';
 
 /**
  * The clearkrypt CLI.
@@ -29,6 +30,9 @@ Commands:
   build [dir]           Check and emit all targets enabled in clearkrypt.toml
   emit [dir] --target <swift|kotlin|react>
                         Check and emit specific targets (repeatable)
+  explain <file> [dir]  Show the compiler's own view of one file: tokens,
+                        AST, checked IR, and generated code per target
+                        (--stage tokens|ast|ir|swift|kotlin|react to narrow)
   format [dir]          Normalize source whitespace (--check to verify only)
   language-server       Run the language server over stdio
 
@@ -82,6 +86,8 @@ async function dispatch(
       return commandCheckOrBuild(rest, cwd, out, err, 'build');
     case 'emit':
       return commandCheckOrBuild(rest, cwd, out, err, 'emit');
+    case 'explain':
+      return commandExplain(rest, cwd, out, err);
     case 'format':
       return commandFormat(rest, cwd, out, err);
     case 'language-server': {

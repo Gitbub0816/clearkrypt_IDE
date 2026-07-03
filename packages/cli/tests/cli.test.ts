@@ -186,6 +186,58 @@ describe('nested (local) functions end to end', () => {
   });
 });
 
+describe('clearkrypt explain', () => {
+  it('shows tokens, AST, IR, and generated code for one file', async () => {
+    const root = copyProject('hello-world');
+    const result = await runCli(['explain', 'src/main.ck', root], workDir);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('== Tokens: src/main.ck ==');
+    expect(result.stdout).toContain('== AST: src/main.ck ==');
+    expect(result.stdout).toContain('== Checked IR: src/main.ck (module app.main) ==');
+    expect(result.stdout).toContain('== Generated swift: src/main.ck ==');
+    expect(result.stdout).toContain('public struct Greeting: Hashable {');
+    expect(result.stdout).toContain('== Generated kotlin: src/main.ck ==');
+    expect(result.stdout).toContain('data class Greeting(');
+    expect(result.stdout).toContain('== Generated react: src/main.ck ==');
+    expect(result.stdout).toContain('export interface Greeting {');
+  });
+
+  it('narrows to a single stage with --stage', async () => {
+    const root = copyProject('hello-world');
+    const result = await runCli(['explain', 'src/main.ck', root, '--stage', 'ir'], workDir);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('== Checked IR:');
+    expect(result.stdout).not.toContain('== Tokens:');
+    expect(result.stdout).not.toContain('== Generated swift:');
+  });
+
+  it('rejects an unknown stage name', async () => {
+    const root = copyProject('hello-world');
+    const result = await runCli(['explain', 'src/main.ck', root, '--stage', 'nonsense'], workDir);
+    expect(result.code).toBe(64);
+    expect(result.stderr).toContain('--stage must be one of');
+  });
+
+  it('rejects a file that is not part of the project', async () => {
+    const root = copyProject('hello-world');
+    const result = await runCli(['explain', 'src/nope.ck', root], workDir);
+    expect(result.code).toBe(64);
+    expect(result.stderr).toContain('is not a .ck file');
+  });
+
+  it('shows diagnostics and skips IR/generated code when the project has errors', async () => {
+    const root = copyProject('hello-world');
+    fs.writeFileSync(
+      path.join(root, 'src', 'main.ck'),
+      'module app.main\n\nfn f() -> String {\n  return 42\n}\n',
+    );
+    const result = await runCli(['explain', 'src/main.ck', root, '--stage', 'ir'], workDir);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain('== Checked IR / generated code: skipped ==');
+    expect(result.stdout).toContain('error[CK0003]');
+  });
+});
+
 describe('clearkrypt emit', () => {
   it('emits only the requested target', async () => {
     const root = copyProject('hello-world');

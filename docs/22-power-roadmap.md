@@ -17,6 +17,11 @@ Shipped and snapshot-tested across Swift, Kotlin, and TypeScript:
 - first-class optionals: `?.`, `??`, `if let`
 - typed `throw` + `try` propagation
 - honest diagnostics with stable codes; a language server; two native IDEs
+- `clearkrypt explain`: a compiler stage viewer (tokens, AST, checked IR,
+  generated code per target for one file)
+- an AI-consumption-tuned language skill (`skills/clearkrypt-language/`,
+  indexed by `llms.txt`) and a standalone-publishable, dependency-free
+  npm CLI (`clearkrypt`)
 
 ## The thesis
 

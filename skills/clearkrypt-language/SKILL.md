@@ -399,6 +399,10 @@ clearkrypt new my-app              # scaffold a new project
 clearkrypt check [dir]             # parse + type-check, no output written
 clearkrypt build [dir]             # check + emit every enabled target
 clearkrypt emit [dir] --target swift   # emit exactly one target (repeatable)
+clearkrypt explain src/main.ck [dir] [--stage tokens|ast|ir|swift|kotlin|react]
+                                    # show the compiler's own view of one file,
+                                    # stage by stage — useful for predicting or
+                                    # debugging exactly what a file will become
 clearkrypt format [dir] [--check]  # normalize whitespace
 clearkrypt language-server         # run the LSP over stdio
 ```
