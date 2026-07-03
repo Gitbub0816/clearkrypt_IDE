@@ -33,7 +33,7 @@ final class SyntaxHighlighterTests: XCTestCase {
         let text = "let a = 1\n/* one\ntwo\nthree */ let b = 2\n"
         let spans = kinds(text)
         let comments = spans.filter { $0.1 == .comment }
-        XCTAssertEqual(comments.count, 4) // "/* one", "two", "three */" scanned per line
+        XCTAssertEqual(comments.count, 3) // "/* one", "two", "three */" scanned per line
         XCTAssertTrue(spans.contains(where: { $0.0 == "let" && $0.1 == .keyword }))
     }
 

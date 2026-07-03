@@ -157,12 +157,10 @@ public struct SyntaxHighlighter {
                     index += 1
                 }
                 let word = String(utf16CodeUnits: Array(characters[start..<index]), count: index - start)
-                if Self.keywords.contains(word) {
-                    if Self.nativeTargets.contains(word) && previousWord == "native" {
-                        emit(start, word.utf16.count, .nativeTarget)
-                    } else {
-                        emit(start, word.utf16.count, .keyword)
-                    }
+                if Self.nativeTargets.contains(word) && previousWord == "native" {
+                    emit(start, word.utf16.count, .nativeTarget)
+                } else if Self.keywords.contains(word) || Self.nativeTargets.contains(word) {
+                    emit(start, word.utf16.count, .keyword)
                 } else if Self.primitiveTypes.contains(word) {
                     emit(start, word.utf16.count, .typeName)
                 } else if Self.declarationKeywords.contains(previousWord) {
