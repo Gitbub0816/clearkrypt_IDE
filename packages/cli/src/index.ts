@@ -84,12 +84,11 @@ async function dispatch(
       return commandCheckOrBuild(rest, cwd, out, err, 'emit');
     case 'format':
       return commandFormat(rest, cwd, out, err);
-    case 'language-server':
-      err.push(
-        'The language server ships with the language-service milestone. ' +
-          'Editors can track progress in docs/07-roadmap-milestones.md.',
-      );
-      return 64;
+    case 'language-server': {
+      // Runs over stdio until the client sends exit (docs/21).
+      const { runStdioServer } = await import('@clearkrypt/language-service');
+      return runStdioServer();
+    }
     default:
       err.push(`Unknown command '${command}'.`);
       err.push(usage);

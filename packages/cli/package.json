@@ -20,6 +20,7 @@
     "@clearkrypt/emitter-swift": "0.1.0",
     "@clearkrypt/emitter-kotlin": "0.1.0",
     "@clearkrypt/emitter-react": "0.1.0",
-    "@clearkrypt/formatter": "0.1.0"
+    "@clearkrypt/formatter": "0.1.0",
+    "@clearkrypt/language-service": "0.1.0"
   }
 }

@@ -4,12 +4,27 @@
     "rootDir": "src",
     "outDir": "dist"
   },
-  "include": ["src/**/*"],
+  "include": [
+    "src/**/*"
+  ],
   "references": [
-    { "path": "../compiler-core" },
-    { "path": "../emitter-swift" },
-    { "path": "../emitter-kotlin" },
-    { "path": "../emitter-react" },
-    { "path": "../formatter" }
+    {
+      "path": "../compiler-core"
+    },
+    {
+      "path": "../emitter-swift"
+    },
+    {
+      "path": "../emitter-kotlin"
+    },
+    {
+      "path": "../emitter-react"
+    },
+    {
+      "path": "../formatter"
+    },
+    {
+      "path": "../language-service"
+    }
   ]
 }
